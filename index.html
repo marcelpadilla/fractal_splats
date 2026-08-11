@@ -99,6 +99,56 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   outline: 2px solid var(--live); outline-offset: 1px;
 }
 
+/* ---- the two switches --------------------------------------------------------
+   Both of these were plain buttons whose LABEL carried the state, and both were
+   read the wrong way round for the same reason. A button that says "Show
+   Gaussians" reads as an ACTION, so nothing on it said whether the mode was
+   currently on; a button that says "Gaussian splats" while Gaussian splats are on
+   screen reads as an offer to switch TO them. A sliding switch has no such
+   ambiguity: the knob is on one side or the other, and the side it is on is the
+   state, which is why every settings panel in the world uses one.
+
+   The whole row is the button, so the pointer target is the width of the panel
+   rather than a thirty pixel pill, and pressing the label works as well as
+   pressing the track. The spans are pointer-events: none so every press is
+   reported by the button itself and there is no dead zone between them.
+   --------------------------------------------------------------------------- */
+.sw {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  text-align: left; text-transform: none; letter-spacing: .03em; font-size: 11.5px;
+}
+.sw > span { pointer-events: none; }
+.sw-l { flex: 1 1 auto; }
+.sw-r { flex: 0 0 auto; min-width: 2.1em; }
+/* The centred variant, for a switch between two named things rather than between on and off:
+   the two labels take equal space, so the track sits in the middle with one on each side. */
+.sw-mid .sw-l { flex: 1 1 0; text-align: right; }
+.sw-mid .sw-r { flex: 1 1 0; min-width: 0; text-align: left; }
+/* Whichever side is live is in the ink colour and the other is dimmed, so the labels carry the
+   state too and the switch is still readable to someone who cannot see the knob move. */
+.sw[data-on="0"] .sw-l, .sw[data-on="1"] .sw-r { color: var(--ink); }
+.sw[data-on="0"] .sw-r, .sw[data-on="1"] .sw-l { color: var(--dim); }
+/* The track, in fixed pixels rather than em, because it is a switch and not text. */
+.sw-t {
+  flex: 0 0 auto; position: relative; width: 30px; height: 15px; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16); border: 1px solid var(--rule);
+  transition: background 120ms linear, border-color 120ms linear;
+}
+.sw-t::after {
+  content: ""; position: absolute; top: 1px; left: 1px; width: 11px; height: 11px;
+  border-radius: 50%; background: var(--ink);
+  transition: transform 120ms ease, background 120ms linear;
+}
+.sw[data-on="1"] .sw-t { background: var(--fill); border-color: var(--fill); }
+.sw[data-on="1"] .sw-t::after { transform: translateX(15px); background: var(--on-fill); }
+/* The panel's filled-button rule is for a button that lights up while it is on. A switch says
+   that with its knob, so the row itself stays the resting colour in both states. */
+button.sw[data-on="1"] {
+  background: rgba(0, 0, 0, 0.55); border-color: var(--rule); color: var(--ink);
+}
+button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .sw-t, .sw-t::after { transition: none; } }
+
 /* A slider row: the label and its value on top, the track under them. `.ctl-run` puts a
    square play/pause button to the left of the whole thing, which is what makes the speed
    control one line instead of two stacked controls. */
@@ -202,7 +252,8 @@ button:focus-visible, select:focus-visible, input:focus-visible {
        this page is made of Gaussians and at a working split threshold not one of them is
        separable, which is what the refinement is for and is also why nobody has to believe it.
        Keyboard: g. -->
-  <button id="btn-gauss" type="button">Show Gaussians</button>
+  <button id="btn-gauss" class="sw" type="button" role="switch" aria-checked="false"
+          aria-label="show Gaussians"><span class="sw-l">Show Gaussians</span><span class="sw-t"></span><span class="sw-r" id="lb-gauss">off</span></button>
   <!-- The flight never stops, so the slowest setting is slow, not stopped. The square button to
        the left of the slider is what stops it, and it sits there rather than on its own row
        because a play control and a speed control are one thought. Keyboard: space. -->
@@ -231,7 +282,8 @@ button:focus-visible, select:focus-visible, input:focus-visible {
        where they are and swaps only the representation, so the comparison is a flicker between two
        frames of one view. It sits at the bottom because it is the last question anyone asks about a
        picture, after they have found a picture worth asking about. Keyboard: x. -->
-  <button id="btn-rep" class="plane-only" type="button">Gaussian splats</button>
+  <button id="btn-rep" class="sw sw-mid plane-only" type="button" role="switch"
+          aria-checked="false" aria-label="draw this view per pixel instead of as splats"><span class="sw-l">Splats</span><span class="sw-t"></span><span class="sw-r">Pixels</span></button>
 </div>
 
 <!-- Splat count, frame time and resolution, every time. That is a rule of this project rather
@@ -2417,6 +2469,19 @@ const MAXBUDGET = perfArenaBudget();
 // depth limit can always win. A surface is exempt: a big surfel near the camera is
 // the ground, not a coarse approximation of it. See `job.attFloor` in startJob.
 let SIZE_CAP = 5.0;
+// A CONSTANT ADDED TO THE HUE OF EVERY SPLAT, in turns. Zero in every shipped frame.
+//
+// It exists for one job: a looping zoom video. The colour law is a hue increment per map summed
+// down the address, so hue MARKS DEPTH, and zooming one contraction deeper rotates the whole frame
+// by the map's increment: -0.06 turns, or 21.6 degrees, for the folded dragon. That is the design
+// and it is right for a descent, where the drift is the only cue that says how far down you are.
+// It is fatal for a loop. The geometry closes exactly under one contraction plus the map's own
+// roll, and then the picture comes back 21.6 degrees off in colour, which reads as a hard flash
+// every time the video wraps. Ramping this from 0 to +0.06 over the loop cancels the drift
+// exactly, so the wrap frame is the first frame in colour as well as in shape.
+//
+// Nothing in the viewer sets it. See loopgen.mjs, which computes the ramp from mapHue directly.
+let HUE_OFF = 0;
 // How far past the point where the fog has attenuated a splat to exp(-8) the depth of field
 // reaches. Exactly 1 in every shipped frame; an evaluation knob, so that "the cull happens too
 // early" can be MEASURED rather than argued about. Rendering the same frozen pose at 1 and at 2
@@ -2616,14 +2681,13 @@ const LOUPE_FRAC = 0.30;    // side of the square, as a fraction of the shorter 
 const LOUPE_MIN = 120;      // and its bounds in device pixels, so it survives a phone and a 4K panel
 const LOUPE_MAX = 340;
 const LOUPE_PAD = 0.022;    // margin from the corner, same units as LOUPE_FRAC
-// The marks: the frame around the square, the box around the region, the crosshair. Neutral, like
-// the ellipses, and translucent enough that they never compete with the object.
+// The marks: the frame around the magnified square, and the box around the region it came from.
+// Both are drawn as a white line between two black ones, which is the only marking that reads on
+// any background, and the escape time frames are exactly the case that needs it: a dense field of
+// saturated colour with no dark ground for a single light mark to sit on. The translucent
+// single-line version these replaced had an alpha constant; it does not exist any more.
 const MARK_COL = new Float32Array([0.98, 0.94, 0.86]);
-// The other half of the region marker. A white line between two black ones reads on any
-// background, which is what the escape time frames need: they are a dense field of saturated
-// colour with no dark ground for a single light mark to sit on.
 const BLACK_COL = new Float32Array([0.0, 0.0, 0.0]);
-const MARK_A = 0.42;
 // Where a splat stops being drawn in this view, as a kernel value. exp(-1/2) = 0.6065 is the one
 // sigma contour, so 0.52 is about 1.09 sigma: the ellipse and a hair outside it, and none of
 // the tail that would otherwise pile up into a fog bank. See the note in the fragment shader.
@@ -3765,7 +3829,9 @@ function ifsRoot(vw, vh) {
   // frac(huBase + local): see `anchor.hue` and buildMapHue in src/40_state.js. Captured
   // here rather than read in the kernel, because a rebase during a rebuild must not move
   // the colours of the cut being built.
-  job.huBase = anchor.hue - Math.floor(anchor.hue);
+  // HUE_OFF is zero in every shipped frame; see its note in src/40_state.js. It rides here rather
+  // than in the shader because the hue is summed on the CPU during the walk.
+  job.huBase = anchor.hue + HUE_OFF - Math.floor(anchor.hue + HUE_OFF);
   // Width of the cross fade band, as a ratio of priority above the split threshold.
   job.fadeK = 1 / (FADE_BAND - 1);
   job.budK = 1 / (BUD_BAND - 1);
@@ -6433,17 +6499,13 @@ function loupeRect(vw, vh) {
   return { x: vw - pad - s, y: vh - pad - s, s };
 }
 
-// One solid rectangle, in pixels, alpha blended over whatever is there. Premultiplied, so the
-// blend below is ONE, ONE_MINUS_SRC_ALPHA.
-function rect(x0, y0, x1, y1, a) {
-  gl.uniform4f(rectUni.uRect, x0, y0, x1, y1);
-  gl.uniform4f(rectUni.uCol, MARK_COL[0] * a, MARK_COL[1] * a, MARK_COL[2] * a, a);
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-
-// The same thing in a chosen colour, and a rectangular OUTLINE of thickness t drawn just inside
-// the given box. Four rects, with the left and right ones shortened so the corners are not drawn
-// twice: at alpha below one, a doubled corner is a visibly brighter dot.
+// ONE SOLID RECTANGLE in pixel coordinates, alpha blended over whatever is there. Premultiplied,
+// so the blend is ONE, ONE_MINUS_SRC_ALPHA. There used to be a second version of this fixed to the
+// mark colour; every mark in the frame now names its own colour, so there is one.
+//
+// `ring` is a rectangular OUTLINE of thickness t drawn just inside the given box. Four rects, with
+// the left and right ones shortened so the corners are not drawn twice: at alpha below one, a
+// doubled corner is a visibly brighter dot.
 function rectCol(x0, y0, x1, y1, c, a) {
   gl.uniform4f(rectUni.uRect, x0, y0, x1, y1);
   gl.uniform4f(rectUni.uCol, c[0] * a, c[1] * a, c[2] * a, a);
@@ -6514,8 +6576,18 @@ function drawInset(vw, vh, count) {
   tonePass(vw, vh);                   // still scissored, so it writes the square and nothing else
   gl.disable(gl.SCISSOR_TEST);
 
-  // The marks. A frame around the square, then the region it came from: a box of side s/m about the
-  // middle of the view, and a crosshair with a gap in it so the middle itself stays visible.
+  // The marks. A frame around the square, then the region it came from.
+  //
+  // BOTH ARE DRAWN THE SAME WAY: a white line with a black one on either side of it. That is what
+  // every map and every measuring instrument does, and for the same reason. A single translucent
+  // light mark needs a dark ground to be seen against, and half the objects here do not provide
+  // one: an escape time frame is a dense field of saturated colour edge to edge, and the frame
+  // around the corner square was as good as invisible on it at 0.42 alpha. Three rings need no
+  // alpha at all and cannot be washed out by a bright frame, whatever colour it happens to be.
+  //
+  // All three sit OUTSIDE the square. The innermost one could be drawn just inside instead, which
+  // would cost nothing in pixels, but it would cover the outermost splats of the very thing the
+  // square exists to show.
   gl.useProgram(progRect);
   gl.uniform2f(rectUni.uVp, vw, vh);
   gl.enable(gl.BLEND);
@@ -6523,10 +6595,9 @@ function drawInset(vw, vh, count) {
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   const w = Math.max(1, Math.round(vh / 720));
   const x1 = r.x + r.s, y1 = r.y + r.s;
-  rect(r.x - w, r.y - w, x1 + w, r.y, MARK_A);
-  rect(r.x - w, y1, x1 + w, y1 + w, MARK_A);
-  rect(r.x - w, r.y, r.x, y1, MARK_A);
-  rect(x1, r.y, x1 + w, y1, MARK_A);
+  ring(r.x - 3 * w, r.y - 3 * w, x1 + 3 * w, y1 + 3 * w, w, BLACK_COL, 0.85);
+  ring(r.x - 2 * w, r.y - 2 * w, x1 + 2 * w, y1 + 2 * w, w, MARK_COL, 1.0);
+  ring(r.x - w, r.y - w, x1 + w, y1 + w, w, BLACK_COL, 0.85);
   // THE REGION MARKER: a plain box, white, with a black outline on BOTH sides of it.
   //
   // It was a translucent box with a crosshair in the middle, and on the escape time sets it was
@@ -7826,19 +7897,31 @@ function syncUI() {
     b.setAttribute('aria-label', cfg.autopilot ? 'pause' : 'play');
     b.setAttribute('title', cfg.autopilot ? 'Pause the descent' : 'Resume the descent');
   }
+  // BOTH OF THESE ARE SLIDING SWITCHES, and neither label ever changes.
+  //
+  // They used to be buttons whose text carried the state, and the text was the problem. The
+  // representation button said what you were LOOKING AT, which is the only labelling that can work
+  // for one word on one button, and it still read as an offer: "Gaussian splats" while showing
+  // Gaussian splats looks like the way to turn them on. The switch names BOTH states at once and
+  // puts the knob under the live one, so there is nothing left to guess. All the state lives in
+  // `data-on`, which drives the knob, the track colour and which label is dimmed, entirely in CSS.
   const rb = el('btn-rep');
   if (rb) {
-    // The button says what you are LOOKING AT, not what it will do. A toggle labelled with its
-    // action is unreadable when the two states are two renderings of the same picture.
-    rb.textContent = isDirect() ? 'Per pixel' : 'Gaussian splats';
-    rb.dataset.on = isDirect() ? '1' : '0';
+    const on = isDirect();
+    rb.dataset.on = on ? '1' : '0';
+    rb.setAttribute('aria-checked', on ? 'true' : 'false');
     rb.disabled = !PIXEL_PAIR[cfg.preset];
   }
   const gb = el('btn-gauss');
   if (gb) {
     gb.dataset.on = cfg.gauss ? '1' : '0';
+    gb.setAttribute('aria-checked', cfg.gauss ? 'true' : 'false');
+    // The one label that does change, because this switch is between on and off rather than
+    // between two named things, and "off"/"on" IS the right hand label.
+    const lb = el('lb-gauss');
+    if (lb) lb.textContent = cfg.gauss ? 'on' : 'off';
     // Nothing to show on the per pixel object, which has no splats in it at all. Saying so with a
-    // disabled control is better than a button that silently does nothing.
+    // disabled control is better than a switch that silently does nothing.
     gb.disabled = isDirect();
   }
   const wrap = el('controls');
@@ -8108,6 +8191,9 @@ function applyURL() {
   // from the same arithmetic the CPU has always used. See planeFlush in src/52_cut_plane.js.
   if (q.has('gf')) gfOn = q.get('gf') === '1';
   GF_MAX_DEC = Math.max(0, Math.min(14, num('gd', GF_MAX_DEC)));
+  // Evaluation only: a constant added to every splat's hue, in turns. Zero everywhere except in
+  // the frames of a looping zoom video. See HUE_OFF in src/40_state.js.
+  HUE_OFF = num('hu', 0);
   // Evaluation only: the splat path's own anti-aliasing, five samples a tangle cell. `sa=0` is
   // the A. See planeNeedsAA in src/52_cut_plane.js.
   SPLAT_AA = Math.max(0, Math.min(1, Math.round(num('sa', SPLAT_AA))));

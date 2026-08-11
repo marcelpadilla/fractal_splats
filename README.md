@@ -1,6 +1,7 @@
 # Fractal Splats
 
 Fractals rendered as Gaussian splats, refined on demand as the camera descends.
+By [Marcel Padilla](https://marcelpadilla.github.io/), ETH Zürich.
 
 **[Open the live demo](https://marcelpadilla.github.io/Projects/Fractal_Splats/)**
 
@@ -14,30 +15,20 @@ Fractals rendered as Gaussian splats, refined on demand as the camera descends.
   <img src="media/sierpinski_carpet.png" alt="Sierpinski carpet" width="32%">
 </p>
 
-<p align="center"><em>Cantor cube, Sierpinski tetrahedron, Sierpinski carpet. The zoom above is also
-available as <a href="media/dragon_zoom.mp4">MP4</a>, which is smaller and much better encoded than
-the GIF.</em></p>
+<p align="center"><em>Cantor cube, Sierpinski tetrahedron, Sierpinski carpet. The zoom above is one
+full contraction of the folded dragon and repeats exactly, so it is a genuine loop rather than a
+clip that restarts. It is also available as <a href="media/dragon_zoom.mp4">MP4</a>, which is
+sharper and smoother than the GIF.</em></p>
 
 ## What it is
 
-A self similar set is its own level of detail hierarchy. A piece of the object is an exact affine
-copy of the whole, so the recursion that defines the fractal is also the tree the renderer walks,
-and the scene can be re-expressed in a piece's own coordinates at any moment. Nothing in the
-renderer ever becomes a very large or a very small number, so the zoom has no precision wall and
-simply continues.
-
-Each piece is drawn as one anisotropic Gaussian rather than as points or triangles. The splat is
-computed in closed form from the piece's own map, never sampled and never fitted, and it is
-refined or retired according to how large it is on screen. The escape time sets, which are not
-self similar, are drawn instead as an adaptive quadtree of Gaussians over the field.
-
-Fifteen objects in three groups: self similar sets in 3D, self similar sets in 2D, and the
-Mandelbrot and Julia sets with a per pixel reference render to compare against.
+An experiment on using Gaussian splats to show fractals. Self similarity is used to create its own
+level of detail hierarchy efficiently while avoiding pixel based computations.
 
 ## Running it
 
 `index.html` is the whole thing. Open it in a browser. There is nothing to build, nothing to
-install and nothing is fetched after load: one HTML file of about 480 kB, WebGL 2, no libraries and
+install and nothing is fetched after load: one HTML file of about 495 kB, WebGL 2, no libraries and
 no data files.
 
 Every view is a deep link, so a picture can be reproduced exactly by its query string.
