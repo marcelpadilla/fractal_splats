@@ -6,18 +6,18 @@ By [Marcel Padilla](https://marcelpadilla.github.io/), ETH Zürich.
 **[Open the live demo](https://marcelpadilla.github.io/Projects/Fractal_Splats/)**
 
 <p align="center">
-  <img src="media/dragon_zoom.gif" alt="A continuous zoom into the folded dragon, drawn as Gaussian splats" width="100%">
+  <img src="media/carpet_zoom.gif" alt="A continuous zoom into the Sierpinski carpet, drawn as Gaussian splats" width="100%">
 </p>
 
 <p align="center">
   <img src="media/cantor_cube.png" alt="Cantor cube" width="32%">
   <img src="media/sierpinski_tetrahedron.png" alt="Sierpinski tetrahedron" width="32%">
-  <img src="media/sierpinski_carpet.png" alt="Sierpinski carpet" width="32%">
+  <img src="media/folded_dragon.png" alt="Folded dragon" width="32%">
 </p>
 
-<p align="center"><em>Cantor cube, Sierpinski tetrahedron, Sierpinski carpet. The zoom above is one
-full contraction of the folded dragon and repeats exactly, so it is a genuine loop rather than a
-clip that restarts. It is also available as <a href="media/dragon_zoom.mp4">MP4</a>, which is
+<p align="center"><em>Cantor cube, Sierpinski tetrahedron, folded dragon. The zoom above magnifies
+the Sierpinski carpet nine times and then repeats exactly, so it is a genuine loop rather than a
+clip that restarts. It is also available as <a href="media/carpet_zoom.mp4">MP4</a>, which is
 sharper and smoother than the GIF.</em></p>
 
 ## What it is
