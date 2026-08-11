@@ -197,12 +197,6 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     <option value="medium">Quality: medium</option>
     <option value="high">Quality: high</option>
   </select>
-  <!-- The same view, drawn the other way. A menu entry cannot answer "is the splat render as good
-       as a per pixel one", because choosing it from the menu reframes the camera and then the two
-       images are of different places. This keeps the camera, the aim, the zoom and the family
-       parameter exactly where they are and swaps only the representation, so the comparison is a
-       flicker between two frames of one view. Keyboard: x. -->
-  <button id="btn-rep" class="plane-only" type="button">Gaussian splats</button>
   <!-- Coarsen the cut until the individual splats are tens of pixels across and draw each one's
        one sigma contour. Works on every object, flat or not. This is here because every frame on
        this page is made of Gaussians and at a working split threshold not one of them is
@@ -230,6 +224,14 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     <label class="ctl"><span>im</span><output id="v-cy">-</output>
       <input id="s-cy" type="range" min="-0.95" max="0.95" step="0.001" aria-label="c imaginary"></label>
   </div>
+  <!-- LAST, and on purpose. The same view, drawn the other way. It is not a fifth object and it is
+       not in the object menu, because a menu entry cannot answer "is the splat render as good as a
+       per pixel one": choosing it from a list reframes the camera, and then the two images are of
+       different places. This keeps the camera, the aim, the zoom and the family parameter exactly
+       where they are and swaps only the representation, so the comparison is a flicker between two
+       frames of one view. It sits at the bottom because it is the last question anyone asks about a
+       picture, after they have found a picture worth asking about. Keyboard: x. -->
+  <button id="btn-rep" class="plane-only" type="button">Gaussian splats</button>
 </div>
 
 <!-- Splat count, frame time and resolution, every time. That is a rule of this project rather
@@ -1680,7 +1682,15 @@ for (const [id, base, nm] of [['mandelgpu', 'mandel2d', 'Mandelbrot set, per pix
   PLANE[id] = Object.assign({}, PLANE[base], {
     name: nm,
     direct: true,
-    // IN THE MENU. It was hidden, on the grounds that its tone was wrong: mean luminance 0.519
+    // NOT IN THE MENU, and that is a statement about what it IS rather than about its quality.
+    // This is not a fifth object, it is the same object drawn the other way, and offering it as a
+    // menu entry says the opposite: picking it from a list reframes the camera, and then the two
+    // images are of different places and cannot be compared at all. It belongs on the toggle at
+    // the bottom of the panel, which keeps the camera, the aim, the zoom and the family parameter
+    // exactly where they are and swaps only the representation. Anyone who opens the Mandelbrot
+    // set finds it there, on the view they are already looking at.
+    hidden: true,
+    // The tone was once the reason it was hidden: mean luminance 0.519
     // against a known good 0.195, with the regions that do not escape coming out far too light.
     // That reading was right about the frame and wrong about the cause, and the cause was not in
     // the colour law at all. Measured against a supersampled reference at the opening view, this
@@ -2538,27 +2548,32 @@ const cfg = {
 // The two absolute sizes here replace the split threshold and the size cap outright, so an object
 // with a fine threshold and an object with a coarse one look the same in this mode, which is the
 // point of it.
-const GAUSS_PX = 5;
+const GAUSS_PX = 3;
 const GAUSS_CAP = 70;
 // The contour's reciprocal width, in units of the kernel value, and its colour. 26 is a line about
 // a tenth of the splat's radius across at the settings here: thin enough to read as a boundary,
 // wide enough to survive the tone map where a splat is only a few pixels.
 //
-// GAUSS_PX was 14 and that is coarser than this view needs. Measured with `gs_probe.mjs`, which
-// builds the real cut on the CPU at 989x1082, the embed's own size, so the number is deterministic
-// and has no autopilot or virtual time in it:
+// GAUSS_PX was 14 and that is far coarser than this view needs. Measured with `gs_probe.mjs`,
+// which builds the real cut on the CPU at 989x1082, the embed's own size, so the number is
+// deterministic and has no autopilot or virtual time in it:
 //
 //   GAUSS_PX   dragon   sierpinski   carpet   cantor
 //        14       821         1184      512     1816
-//         6      5092         5073     4096     4981
 //         5      6145         7941     4096    10816
 //         4     10493        15057    36864    23492
+//         3     20195        20360    32768    31976
 //
-// 5 is the choice. It puts every object in the four to eleven thousand band, which is the density
-// this view wants, and at 4 the carpet jumps a whole level to 37k while the dragon is still at 10k,
-// so the objects stop being comparable to each other. The ellipses at 5 are about ten pixels
-// across, which is still plainly legible; the count goes as the inverse square of the threshold,
-// so this is a factor of seven more primitives than 14 gave.
+// 3 is the choice, and it is chosen on the two objects the viewer opens on: the dragon and the
+// Sierpinski tetrahedron both land at almost exactly twenty thousand ellipses. The carpet and the
+// Cantor cube run higher because their trees branch wider, and that is fine, they are still inside
+// the budget.
+//
+// At 3 the ellipses are about six pixels across and the FULL FRAME reads as a texture rather than
+// as separable circles. That is not a failure of the setting, it is what the magnified corner is
+// for: the whole view shows how the primitives are distributed, and the corner is where they are
+// counted. Going coarser to make them separable in the full frame is the trade this mode already
+// rejected once, and it costs the distribution.
 //
 // A WARNING about measuring this through the browser. The first version of this sweep read the
 // readout out of a headless capture and got 0 splats at fine thresholds and 5.3k for the same
@@ -2604,6 +2619,10 @@ const LOUPE_PAD = 0.022;    // margin from the corner, same units as LOUPE_FRAC
 // The marks: the frame around the square, the box around the region, the crosshair. Neutral, like
 // the ellipses, and translucent enough that they never compete with the object.
 const MARK_COL = new Float32Array([0.98, 0.94, 0.86]);
+// The other half of the region marker. A white line between two black ones reads on any
+// background, which is what the escape time frames need: they are a dense field of saturated
+// colour with no dark ground for a single light mark to sit on.
+const BLACK_COL = new Float32Array([0.0, 0.0, 0.0]);
 const MARK_A = 0.42;
 // Where a splat stops being drawn in this view, as a kernel value. exp(-1/2) = 0.6065 is the one
 // sigma contour, so 0.52 is about 1.09 sigma: the ellipse and a hair outside it, and none of
@@ -6422,6 +6441,21 @@ function rect(x0, y0, x1, y1, a) {
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
+// The same thing in a chosen colour, and a rectangular OUTLINE of thickness t drawn just inside
+// the given box. Four rects, with the left and right ones shortened so the corners are not drawn
+// twice: at alpha below one, a doubled corner is a visibly brighter dot.
+function rectCol(x0, y0, x1, y1, c, a) {
+  gl.uniform4f(rectUni.uRect, x0, y0, x1, y1);
+  gl.uniform4f(rectUni.uCol, c[0] * a, c[1] * a, c[2] * a, a);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+function ring(x0, y0, x1, y1, t, c, a) {
+  rectCol(x0, y0, x1, y0 + t, c, a);
+  rectCol(x0, y1 - t, x1, y1, c, a);
+  rectCol(x0, y0 + t, x0 + t, y1 - t, c, a);
+  rectCol(x1 - t, y0 + t, x1, y1 - t, c, a);
+}
+
 // THE MAGNIFIED CORNER. Drawn only in the Gaussian view, where the subject is the primitives.
 //
 // It is the same cut, projected with the focal length multiplied by LOUPE_MAG about the middle of
@@ -6493,17 +6527,23 @@ function drawInset(vw, vh, count) {
   rect(r.x - w, y1, x1 + w, y1 + w, MARK_A);
   rect(r.x - w, r.y, r.x, y1, MARK_A);
   rect(x1, r.y, x1 + w, y1, MARK_A);
+  // THE REGION MARKER: a plain box, white, with a black outline on BOTH sides of it.
+  //
+  // It was a translucent box with a crosshair in the middle, and on the escape time sets it was
+  // close to invisible. Two separate reasons, and the crosshair was the worse of them. The
+  // Mandelbrot and Julia frames are a dense field of saturated colour with no dark background to
+  // sit on, so a single translucent light mark at 0.42 alpha has nothing to contrast against, and
+  // the crosshair, being thin lines over the busiest part of the frame, disappeared entirely while
+  // also covering the middle of the very region it was pointing at.
+  //
+  // A white line between two black ones is legible on ANY background, which is why every map and
+  // every measuring instrument draws its marks that way. It costs three rings instead of one and
+  // needs no alpha at all, so it cannot be washed out by a bright frame.
   const h = r.s / (2 * LOUPE_MAG);    // half the side of the region the square is showing
   const mx = vw * 0.5 + px, my = vh * 0.5 + py;
-  rect(mx - h, my - h, mx + h, my - h + w, MARK_A);
-  rect(mx - h, my + h - w, mx + h, my + h, MARK_A);
-  rect(mx - h, my - h, mx - h + w, my + h, MARK_A);
-  rect(mx + h - w, my - h, mx + h, my + h, MARK_A);
-  const g = Math.max(3, Math.round(h * 0.30)), arm = Math.max(6, Math.round(h * 0.50));
-  rect(mx - g - arm, my - w * 0.5, mx - g, my + w * 0.5, MARK_A * 1.7);
-  rect(mx + g, my - w * 0.5, mx + g + arm, my + w * 0.5, MARK_A * 1.7);
-  rect(mx - w * 0.5, my - g - arm, mx + w * 0.5, my - g, MARK_A * 1.7);
-  rect(mx - w * 0.5, my + g, mx + w * 0.5, my + g + arm, MARK_A * 1.7);
+  ring(mx - h - 2 * w, my - h - 2 * w, mx + h + 2 * w, my + h + 2 * w, w, BLACK_COL, 0.85);
+  ring(mx - h - w, my - h - w, mx + h + w, my + h + w, w, MARK_COL, 1.0);
+  ring(mx - h, my - h, mx + h, my + h, w, BLACK_COL, 0.85);
   gl.disable(gl.BLEND);
 }
 
@@ -7773,7 +7813,7 @@ function syncUI() {
     if (v) v.textContent = show();
   }
   const sel = el('preset');
-  if (sel && sel.value !== cfg.preset) sel.value = cfg.preset;   // a URL may override the default
+  if (sel && sel.value !== menuValue()) sel.value = menuValue();   // a URL may override the default
   // The run control is a single square next to the speed slider rather than a labelled button on
   // its own row. It shows what pressing it WILL do, which is the convention every media control
   // uses and the opposite of the representation button below: there, the two states are two
@@ -7790,7 +7830,7 @@ function syncUI() {
   if (rb) {
     // The button says what you are LOOKING AT, not what it will do. A toggle labelled with its
     // action is unreadable when the two states are two renderings of the same picture.
-    rb.textContent = isDirect() ? 'Per pixel (GPU)' : 'Gaussian splats';
+    rb.textContent = isDirect() ? 'Per pixel' : 'Gaussian splats';
     rb.dataset.on = isDirect() ? '1' : '0';
     rb.disabled = !PIXEL_PAIR[cfg.preset];
   }
@@ -7810,6 +7850,12 @@ function syncUI() {
 }
 
 function is2D(P) { return P.kind === 'plane' || !!P.flat; }
+
+// What the object picker should READ as. The per pixel objects are not in the menu, because they
+// are not separate objects: they are the same scene drawn the other way, and they live on the
+// toggle at the bottom of the panel. So while one of them is loaded the picker still has to name
+// the scene, or it goes blank and the panel says the viewer is showing nothing.
+function menuValue() { return (PIXEL_PAIR[cfg.preset] && PRESETS[cfg.preset].direct) ? PIXEL_PAIR[cfg.preset] : cfg.preset; }
 
 // THREE groups, not two, and the third one is the distinction that actually matters here.
 //
@@ -7868,8 +7914,14 @@ function bindUI() {
   // of them and the menu came back with the two plane objects in it and nothing else. That
   // is the entire "where did the Sierpinski and the dragon go".
   fillPresetMenu(sel);
-  sel.value = cfg.preset;
-  sel.addEventListener('change', () => loadPreset(sel.value, false));
+  sel.value = menuValue();
+  // Choosing a scene from the picker leaves the representation where it is: if the per pixel
+  // toggle is on and you pick Julia, you get the per pixel Julia. Anything else makes the toggle
+  // silently reset itself every time the scene changes.
+  sel.addEventListener('change', () => {
+    const want = (isDirect() && PIXEL_PAIR[sel.value]) ? PIXEL_PAIR[sel.value] : sel.value;
+    loadPreset(want, false);
+  });
 
   for (const [id, key, xf] of SLIDERS) {
     const s = el(id);
@@ -7935,7 +7987,7 @@ function rebuildPresetMenu() {
   if (!sel) return;
   sel.innerHTML = '';
   fillPresetMenu(sel);
-  sel.value = cfg.preset;
+  sel.value = menuValue();
 }
 
 // Swap between the splat render and the per pixel one WITHOUT moving the camera. loadPreset with
@@ -7961,9 +8013,28 @@ function swapRepresentation() {
 // The Gaussian view changes the split threshold, which is a structural property of the cut, so the
 // current one is thrown away rather than left to drift: the two disagree about splat size by an
 // order of magnitude and `dirty` alone would leave the old one on screen through the transition.
+// THE GAUSSIAN VIEW IS REMEMBERED, across reloads and across every change of object.
+//
+// It survives an object change already, because nothing in loadPreset touches cfg.gauss. What it
+// did not survive is a reload, and that is the case that matters: this view is how someone checks
+// what the picture is made of, and having to switch it back on after every reload makes it read as
+// a momentary effect rather than as a way of looking at the thing.
+//
+// localStorage throws rather than returning null in a sandboxed iframe or with cookies blocked,
+// and touching the property itself can throw, so both sides are wrapped. The same rule the theme
+// code here follows.
+const GAUSS_KEY = 'fractalsplats.gauss';
+function gaussRemember(v) {
+  try { localStorage.setItem(GAUSS_KEY, v ? '1' : '0'); } catch (e) { /* private mode, no matter */ }
+}
+function gaussRecall() {
+  try { return localStorage.getItem(GAUSS_KEY) === '1' ? 1 : 0; } catch (e) { return 0; }
+}
+
 function toggleGauss() {
   if (isDirect()) return;
   cfg.gauss = cfg.gauss ? 0 : 1;
+  gaussRemember(cfg.gauss);
   paramKey = '';
   syncUI();
 }
@@ -8592,6 +8663,8 @@ function boot() {
     return;
   }
   themeInit();
+  // Before applyURL, so an explicit gs= in the query still wins over what was remembered.
+  cfg.gauss = gaussRecall();
   bindUI();
   if (!applyURL()) loadPreset(cfg.preset, false);
   syncUI();
