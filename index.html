@@ -209,6 +209,30 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
 #sound b { font-weight: 400; color: var(--live); }
 #sound b[data-warn="1"] { color: #ff7a5f; }
 #sound .more { flex-basis: 100%; white-space: normal; color: var(--dim); }
+/* ---- the progress bar --------------------------------------------------------
+   Only the escape time objects have it, and only because only they are slow
+   enough to need one: a plane cut is 0.4 to 8 seconds of one CPU thread and the
+   sharpening ramp that follows it runs for twenty five, so without this the
+   viewer sees a picture quietly improving with nothing to say whether more is
+   coming or whether that is all there is (2026-08-12: "I also think the
+   Mandelbrot and Julia set should have some sort of loading bars").
+
+   It is a THIN RULE and not a widget. It sits in the readout strip, in the
+   readout's own colours, and it disappears the moment there is nothing left to
+   wait for, because a progress bar that is always on screen stops being read.
+   The track is drawn at low contrast so an empty bar is not mistaken for a
+   full one. */
+#prog { display: flex; align-items: center; gap: 7px; flex-basis: 100%; }
+#prog[hidden] { display: none; }
+#prog i { font-style: normal; color: var(--dim); }
+#prog .track {
+  flex: 1 1 auto; max-width: 260px; height: 3px; border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14); overflow: hidden;
+}
+#prog .track b {
+  display: block; height: 100%; width: 0; border-radius: 2px;
+  background: var(--live); transition: width .12s linear;
+}
 #sound .more b { color: var(--ink); }
 #controls:not([data-info="1"]) ~ #sound .more { display: none; }
 #btn-info {
@@ -220,6 +244,36 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
   font: 400 13px/1 var(--mono); text-transform: none; letter-spacing: 0;
   display: grid; place-items: center;
 }
+/* ---- the magnified squares' captions ----------------------------------------
+   Text, over a canvas that has no text in it. There is no font in this renderer
+   and no reason to add one for two labels and a sentence, so these are ordinary
+   elements positioned from the same rectangles the squares are drawn in; see
+   loupeNote in src/60_gl.js, and mind that those rectangles are in DEVICE pixels.
+
+   The sentence is the point of the whole block. The readout says thirty thousand
+   splats in this mode and three hundred and forty thousand out of it, and a
+   viewer who is not told why can only conclude that one of the two is a lie. */
+#loupe-note {
+  position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  font: 400 10.5px/1.35 var(--mono);
+}
+#loupe-note[hidden] { display: none; }
+#loupe-note .lz {
+  position: absolute; font-weight: 400; letter-spacing: .08em; color: var(--ink);
+  background: rgba(0, 0, 0, 0.62); border: 1px solid var(--rule); border-radius: 2px;
+  padding: 0 4px 1px;
+}
+#loupe-note .lz[hidden] { display: none; }
+/* On its own chip, because it lands ON the render and the render can be anything from black to
+   a field of saturated colour. A text shadow is not enough against the second of those. */
+#lcap {
+  position: absolute; color: var(--ink); text-align: right; text-wrap: balance;
+  background: rgba(0, 0, 0, 0.80); border: 1px solid var(--rule); border-radius: 2px;
+  padding: 3px 5px 4px;
+}
+#lcap[hidden] { display: none; }
+@media (max-width: 620px) { #loupe-note { font-size: 9.5px; } #lcap { display: none; } }
+
 #nogl {
   position: fixed; inset: 0; display: grid; place-items: center; padding: 30px;
   text-align: center; color: #ff7a5f; font: 400 14px/1.6 var(--mono); background: #05070b;
@@ -260,7 +314,7 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
   <div class="ctl-row">
     <button id="btn-run" data-on="1" type="button" aria-label="pause">&#9208;</button>
     <label class="ctl"><span>speed</span><output id="v-rate">-</output>
-      <input id="s-rate" type="range" min="0.05" max="1.6" step="0.01" aria-label="speed"></label>
+      <input id="s-rate" type="range" min="0.15" max="3" step="0.01" aria-label="speed"></label>
   </div>
   <label class="ctl plane-only"><span>exponent</span><output id="v-power">-</output>
     <input id="s-power" type="range" min="2" max="8" step="1" aria-label="exponent"></label>
@@ -299,8 +353,18 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
     &nbsp; <i>pos err</i> <b id="h-err">-</b> &nbsp; <i>buffer</i> <b id="h-fmt">-</b></span>
   <span class="more"><i>cut</i> <b id="h-cut">-</b> &nbsp; <b id="h-extra">-</b></span>
   <span class="more"><i>raster</i> <b id="h-gpu">-</b></span>
+  <!-- Shown only while an escape time object still has work to do. See progress() in
+       src/70_ui.js for what the two states measure. -->
+  <div id="prog" hidden><i id="prog-l">building</i><span class="track"><b id="prog-b"></b></span></div>
 </div>
 <button id="btn-info" type="button" aria-label="more numbers" title="more numbers">i</button>
+
+<!-- Captions for the two magnified squares. Positioned by loupeNote in src/70_ui.js's frame loop
+     and hidden whenever the squares are not on screen. -->
+<div id="loupe-note" hidden>
+  <b class="lz" id="lz0"></b><b class="lz" id="lz1"></b>
+  <span id="lcap">A coarser cut, drawn large on purpose. The ordinary render uses far more splats, far smaller.</span>
+</div>
 
 <div id="nogl" hidden>
   This needs WebGL 2. Every current desktop browser has it; if you are seeing this,
@@ -2468,6 +2532,9 @@ const MAXBUDGET = perfArenaBudget();
 // and the shader fades out whatever is over it anyway, because the budget or the
 // depth limit can always win. A surface is exempt: a big surfel near the camera is
 // the ground, not a coarse approximation of it. See `job.attFloor` in startJob.
+// What speed 1 on the slider means, in e-folds a second. The default used to be 0.4 and this is
+// a little slower, which is what a descent that is being LOOKED at wants; the slider reaches 3.
+const RATE1 = 0.32;
 let SIZE_CAP = 5.0;
 // A CONSTANT ADDED TO THE HUE OF EVERY SPLAT, in turns. Zero in every shipped frame.
 //
@@ -2559,7 +2626,13 @@ const cfg = {
   fog: 0.55,
   precision: 'f64',    // f32 emulates every shipping splat renderer
   autopilot: true,
-  rate: 0.4,           // descent speed, e-folds per second
+  // THE DESCENT SPEED, in e-folds per second, which is NOT what the slider says. The slider says
+  // a plain number with 1 at the default, because the panel had "0.40 /s" on it and a viewer has
+  // no way to know what a per second means here: it is not frames, not zoom factor and not
+  // distance, it is the exponent of the camera distance. A number with a unit that cannot be
+  // guessed is worse than a number with none. RATE1 is what speed 1 means; see the slider table
+  // in src/70_ui.js.
+  rate: 0.32,
   rebase: true,        // exact anchor rebasing: unbounded zoom
   relief: 0.42,        // terrain slope
   iters: 420,          // terrain base iteration count
@@ -2613,8 +2686,52 @@ const cfg = {
 // The two absolute sizes here replace the split threshold and the size cap outright, so an object
 // with a fine threshold and an object with a coarse one look the same in this mode, which is the
 // point of it.
-let GAUSS_PX = 4;
+let GAUSS_PX = 2.5;
 const GAUSS_CAP = 70;
+// THE PLANE OBJECTS NEED THEIR OWN SIZE, and they need the split test to be about size at all.
+//
+// Reported 2026-08-12: "the julia set is doing a terrible job at showing the splats view
+// sometimes, way too little splats". Measured at the embed's 989x1082 it is 1.1k splats against
+// the 24k to 34k the iterated function systems draw in the same mode, and the frame is a handful
+// of enormous discs over the smooth regions with a sparse dot grid along the boundary.
+//
+// The cause is not the threshold, it is the criterion. An IFS node splits on SIZE, so
+// `GAUSS_PX` alone decides its cut. A plane cell splits on how much of the colour ramp it spans,
+// with size only as an outer cap (`maxPx`), and in this mode that cap is `GAUSS_CAP`, 70 px. So a
+// region where the field is flat, which on a Julia set is most of the frame, is covered by 70
+// pixel discs and nothing asks it to do better. The mode exists to make every object show
+// primitives of ONE size, and on these two objects it was doing the opposite.
+//
+// So in the Gaussian view a plane cell splits on size, exactly as a node does, and the size is
+// its own number. It has to be: a plane cell costs an escape time evaluation and an IFS node
+// costs a matrix multiply, so 2.5 px here would be a quarter of a million orbits for a mode that
+// is a demonstration rather than a render.
+//
+// Measured with `gs_probe.mjs --plane`, which builds the REAL cut on the CPU at 989x1082, the
+// embed's own size, with the latency ceiling lifted so the number is about the threshold and not
+// about the clock. Both objects give the same count, and that is the point of the mode rather
+// than a bug: the criterion is size, so the tiling of a given window is the same whatever field
+// is under it.
+//
+//   GAUSS_PX_PLANE   splats   levels   cell size
+//        70 (before)   1 376    5 - 6   the complaint
+//        11 to 14     12 744    8       11 to 14 px
+//         8 to 10     61 480    8 - 9
+//         7           49 184    9        5.5 to 7 px
+//         5          240 660    9 - 10
+//
+// The count is quantized by quadtree level, which is why it does not fall monotonically: a
+// threshold that lands mid level puts the whole cut inside the cross fade band and every parent
+// is drawn alongside its four children.
+//
+// 7 IS THE CHOICE, giving 49 184 against the 24 500 to 33 800 the iterated function systems draw
+// in the same mode, which is the same order and is what "one size on every object" has to mean
+// here. 11 would be cheaper at 12 744, and it was rejected on the picture: at 90 by 98 cells the
+// Julia boundary stops being legible through the ellipses, and a mode whose whole job is to show
+// the primitives without hiding the object has to keep the object.
+// `let`, not `const`: `gs_probe.mjs` sweeps it, and `gp=` in the query sets it
+// alongside GAUSS_PX so a frame in a report can be reproduced.
+let GAUSS_PX_PLANE = 7;
 // The contour's reciprocal width, in units of the kernel value, and its colour. 26 is a line about
 // a tenth of the splat's radius across at the settings here: thin enough to read as a boundary,
 // wide enough to survive the tone map where a splat is only a few pixels.
@@ -2629,20 +2746,25 @@ const GAUSS_CAP = 70;
 //         4     10493        15057    36864    23492
 //         3     20195        20360    32768    31976
 //
-// 4 IS THE CHOICE, and it was 3, and the correction came from a complaint about aliasing that
-// turned out to be about DENSITY as much as about the line.
+// 2.5 IS THE CHOICE, and the number went 14, 3, 4, 2.5 as the mode was argued about. What settled
+// it was not the number at all: it was giving the mode TWO magnified squares instead of one.
 //
-// At 3 the ellipses are about six pixels across. A drawn outline cannot be narrower than the pixel
-// grid, so a legible one is at least a pixel wide, which on a six pixel ellipse is a third of its
-// radius; a few of them overlapping and the frame is white. Swept at 3 with outline half widths of
-// 0.25, 0.35, 0.45 and 0.75 px, all four came back as a white texture with no separable ellipse
-// anywhere in the full frame. There is no setting of the LINE that fixes that, because the problem
-// is that there is no room for a line.
+// The tension is real and it does not go away. A drawn outline cannot be narrower than the pixel
+// grid, so a legible one is at least a pixel wide, and a pixel is a third of the radius of a six
+// pixel ellipse; a few of those overlapping and the full frame is white. Swept at a six pixel
+// ellipse with outline half widths of 0.25, 0.35, 0.45 and 0.75 px, all four came back as a white
+// texture with no separable ellipse anywhere. There is no setting of the LINE that fixes it.
 //
-// At 4 the dragon is 10.5k and the Sierpinski tetrahedron 15.1k at the opening view, the ellipses
-// are about eight pixels across, and the outlines read. That is fewer than the twenty thousand
-// this was set to, and the twenty thousand were not visible as Gaussians, which is the one thing
-// this mode exists to show.
+// So the full frame stops trying to be the place the ellipses are counted. It shows how the
+// primitives are DISTRIBUTED, which wants as many as the budget allows, and the two corner squares
+// show what they ARE, which wants magnification rather than fewer splats. At 2.5 px the count at
+// the opening view is 24.5k on the dragon, 31.8k on the Sierpinski tetrahedron, 32.8k on the
+// carpet and 33.8k on the Cantor cube, all measured with `gs_probe.mjs` on the CPU because the
+// browser cannot measure this; see the warning below.
+//
+// The count is still far below what the ordinary render draws, and that is now SAID, in a caption
+// under the squares. A viewer who sees thirty thousand where the readout said three hundred and
+// forty thousand a moment ago should be told why rather than left to wonder.
 //
 // A WARNING about measuring this through the browser. The first version of this sweep read the
 // readout out of a headless capture and got 0 splats at fine thresholds and 5.3k for the same
@@ -2653,7 +2775,7 @@ const GAUSS_CAP = 70;
 // kernel's own value, which is a width that scales with the splat: fine at 28 pixel ellipses and
 // 0.19 px at the six pixel ones this mode draws now, which aliases into a dotted crawl. The shader
 // measures pixels with a screen space derivative now; see the note on `dp` in src/60_gl.js.
-let GAUSS_RING = 0.35;
+let GAUSS_RING = 0.20;
 // How much of the splat's own colour the interior carries. The outline stays neutral. At 0.022,
 // which is what this was when the interior existed only so that overlaps would read, the tint is
 // invisible: the tone map divides accumulated colour by accumulated alpha and at that weight the
@@ -2684,7 +2806,15 @@ const GAUSS_FILL = 0.13;
 // attractor by construction, and for a field object it is a point of the boundary. It is also the
 // honest answer to "where am I zooming", because it is literally the point the descent is flying
 // into.
-const LOUPE_MAG = 2.6;      // magnification. See the note in drawInset on why not more
+// TWO MAGNIFICATIONS, not one, and the second is the square of the first on purpose: the step from
+// the frame into the first square is then exactly the step from the first square into the second,
+// so the pair reads as one continued zoom rather than as two unrelated crops. It is also the
+// answer to the question the single square could not settle. One square had to choose between
+// being strong enough to separate the ellipses and weak enough to show a dozen of them at once,
+// and at any single number one of those two is given up. Two squares give both.
+const LOUPE_MAG = [3.2, 10.24];
+const MULT = String.fromCharCode(215);   // the times sign, for the squares' labels
+const LOUPE_GAP = 0.020;    // between the two squares, as a fraction of the shorter side
 const LOUPE_FRAC = 0.30;    // side of the square, as a fraction of the shorter side of the frame
 const LOUPE_MIN = 120;      // and its bounds in device pixels, so it survives a phone and a 4K panel
 const LOUPE_MAX = 340;
@@ -3743,7 +3873,10 @@ function startJob(vw, vh) {
     : 1 - 0.5 * Math.min(1, stillCuts / 4);
   // And the Gaussian view coarsens outright, which overrides the sharpening: the point of it is
   // splats you can see. See GAUSS_PX.
-  job.splitPx = cfg.gauss ? GAUSS_PX : cfg.splitPx * stillPx;
+  // The plane objects get their own absolute size in this mode, and their split test becomes a
+  // size test; see GAUSS_PX_PLANE in src/40_state.js for the measurement and the reason.
+  job.splitPx = cfg.gauss ? (plane ? GAUSS_PX_PLANE : GAUSS_PX)
+    : cfg.splitPx * stillPx;
   job.sig = cfg.sigma;
   // No splat may stay large on screen, however little light reaches it.
   //
@@ -5080,8 +5213,12 @@ function stepPlane(budgetMs) {
       // boundary test is stated here instead. Same set of cells as before, decided from the kind
       // and the distance estimate rather than from a sentinel in the filter width. See planeFinish.
       const o9i = i * 9;
+      // In the Gaussian view the criterion is SIZE and nothing else, so this object shows the
+      // same lattice of primitives an IFS object does. The ramp span test is what left the
+      // smooth interior of a Julia set as a handful of seventy pixel discs; see GAUSS_PX_PLANE.
       const want = pool.fp[i] > maxPx ||
-        (!over && (pool.cc[i] > tol || planeTangle(pool.M[o9i + 5], pool.M[o9i + 4], pool.M[o9i + 2])));
+        (!over && (cfg.gauss || pool.cc[i] > tol
+                   || planeTangle(pool.M[o9i + 5], pool.M[o9i + 4], pool.M[o9i + 2])));
       let split = want && pool.fp[i] > splitPx && pool.depth[i] < 200 && cutSize + 5 <= cap;
       let tbud = 1;
       if (split && bLow !== -Infinity) {
@@ -6535,12 +6672,19 @@ function tonePass(vw, vh) {
 // independent, no sort, and the accumulation stays additive.
 // Where the magnified square sits, in device pixels, origin bottom left. Null if the frame is too
 // small to give a third of its short side to a diagram, which is a phone held upright.
-function loupeRect(vw, vh) {
+// The i-th square, top down the right hand edge, or null if there is no room for it. Null on the
+// SECOND one is the ordinary case on a short window, and the frame then shows one square rather
+// than a cramped pair: a magnified view that has been squeezed says less than no magnified view.
+function loupeRect(vw, vh, i) {
   const short = Math.min(vw, vh);
   if (short < 320) return null;
   const s = Math.round(Math.max(LOUPE_MIN, Math.min(LOUPE_MAX, LOUPE_FRAC * short)));
   const pad = Math.round(LOUPE_PAD * short);
-  return { x: vw - pad - s, y: vh - pad - s, s };
+  const gap = Math.round(LOUPE_GAP * short);
+  // Room for the whole column, and never more than about three quarters of the frame's height in
+  // squares, or the corner has stopped being a corner.
+  if (i > 0 && (i + 1) * s + i * gap + 2 * pad > vh * 0.72) return null;
+  return { x: vw - pad - s, y: vh - pad - s - i * (s + gap), s };
 }
 
 // ONE SOLID RECTANGLE in pixel coordinates, alpha blended over whatever is there. Premultiplied,
@@ -6599,25 +6743,35 @@ function loupeAim(vw, vh, pad) {
 }
 
 function drawInset(vw, vh, count) {
-  const r = loupeRect(vw, vh);
-  if (!r) return;
-  // The point being magnified, as an offset in pixels from the middle of the frame.
-  const aim = loupeAim(vw, vh, r.s / (2 * LOUPE_MAG) + 6);
+  const rects = [];
+  for (let i = 0; i < LOUPE_MAG.length; i++) {
+    const r = loupeRect(vw, vh, i);
+    if (!r) break;
+    rects.push(r);
+  }
+  if (!rects.length) return;
+  // The point being magnified, as an offset in pixels from the middle of the frame. Both squares
+  // show the SAME point, so there is one of these; the clamp is against the largest marked region,
+  // which is the one belonging to the weakest magnification.
+  const aim = loupeAim(vw, vh, rects[0].s / (2 * LOUPE_MAG[0]) + 8);
   const px = aim[0], py = aim[1];
-  // Put that point in the middle of the square. The projection scales about the eye axis, so the
-  // point lands at m*(px, py) and the shift is whatever moves that to the middle of the square.
-  const cx = r.x + r.s * 0.5 - vw * 0.5, cy = r.y + r.s * 0.5 - vh * 0.5;
-  const mag = { m: LOUPE_MAG, x: cx - LOUPE_MAG * px, y: cy - LOUPE_MAG * py };
 
   gl.enable(gl.SCISSOR_TEST);
-  gl.scissor(r.x, r.y, r.s, r.s);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-  gl.viewport(0, 0, vw, vh);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clearDepth(1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  splatPass(vw, vh, count, mag);
-  tonePass(vw, vh);                   // still scissored, so it writes the square and nothing else
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i], m = LOUPE_MAG[i];
+    // Put the aim in the middle of the square. The projection scales about the eye axis, so the
+    // point lands at m*(px, py) and the shift is whatever moves that to the middle of the square.
+    const cx = r.x + r.s * 0.5 - vw * 0.5, cy = r.y + r.s * 0.5 - vh * 0.5;
+    const mag = { m, x: cx - m * px, y: cy - m * py };
+    gl.scissor(r.x, r.y, r.s, r.s);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, vw, vh);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clearDepth(1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    splatPass(vw, vh, count, mag);
+    tonePass(vw, vh);                 // still scissored, so it writes the square and nothing else
+  }
   gl.disable(gl.SCISSOR_TEST);
 
   // The marks. A frame around the square, then the region it came from.
@@ -6638,10 +6792,12 @@ function drawInset(vw, vh, count) {
   gl.blendEquation(gl.FUNC_ADD);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   const w = Math.max(1, Math.round(vh / 720));
-  const x1 = r.x + r.s, y1 = r.y + r.s;
-  ring(r.x - 3 * w, r.y - 3 * w, x1 + 3 * w, y1 + 3 * w, w, BLACK_COL, 0.85);
-  ring(r.x - 2 * w, r.y - 2 * w, x1 + 2 * w, y1 + 2 * w, w, MARK_COL, 1.0);
-  ring(r.x - w, r.y - w, x1 + w, y1 + w, w, BLACK_COL, 0.85);
+  for (const r of rects) {
+    const x1 = r.x + r.s, y1 = r.y + r.s;
+    ring(r.x - 3 * w, r.y - 3 * w, x1 + 3 * w, y1 + 3 * w, w, BLACK_COL, 0.85);
+    ring(r.x - 2 * w, r.y - 2 * w, x1 + 2 * w, y1 + 2 * w, w, MARK_COL, 1.0);
+    ring(r.x - w, r.y - w, x1 + w, y1 + w, w, BLACK_COL, 0.85);
+  }
   // THE REGION MARKER: a plain box, white, with a black outline on BOTH sides of it.
   //
   // It was a translucent box with a crosshair in the middle, and on the escape time sets it was
@@ -6654,12 +6810,73 @@ function drawInset(vw, vh, count) {
   // A white line between two black ones is legible on ANY background, which is why every map and
   // every measuring instrument draws its marks that way. It costs three rings instead of one and
   // needs no alpha at all, so it cannot be washed out by a bright frame.
-  const h = r.s / (2 * LOUPE_MAG);    // half the side of the region the square is showing
+  //
+  // ONE MARKER PER SQUARE, and they nest, which is the point. The second magnification is the
+  // square of the first, so the smaller marked region sits inside the larger one in exactly the
+  // proportion the larger one sits inside the frame. Read outwards, the three views are one
+  // continued zoom, and the two markers say where each of them came from.
   const mx = vw * 0.5 + px, my = vh * 0.5 + py;
-  ring(mx - h - 2 * w, my - h - 2 * w, mx + h + 2 * w, my + h + 2 * w, w, BLACK_COL, 0.85);
-  ring(mx - h - w, my - h - w, mx + h + w, my + h + w, w, MARK_COL, 1.0);
-  ring(mx - h, my - h, mx + h, my + h, w, BLACK_COL, 0.85);
+  for (let i = 0; i < rects.length; i++) {
+    const h = rects[i].s / (2 * LOUPE_MAG[i]);   // half the side of the region that square shows
+    ring(mx - h - 2 * w, my - h - 2 * w, mx + h + 2 * w, my + h + 2 * w, w, BLACK_COL, 0.85);
+    ring(mx - h - w, my - h - w, mx + h + w, my + h + w, w, MARK_COL, 1.0);
+    ring(mx - h, my - h, mx + h, my + h, w, BLACK_COL, 0.85);
+  }
   gl.disable(gl.BLEND);
+}
+
+// THE CAPTIONS ON THE SQUARES, and they are HTML rather than drawn.
+//
+// Nothing else in this frame is text, and that is deliberate: there is no font in this renderer,
+// no glyph atlas, and no reason to add one for two labels and a sentence. They are positioned over
+// the canvas from the same rectangles the squares are drawn in. The one thing that has to be right
+// is the unit: those rectangles are in DEVICE pixels and a CSS position is in CSS pixels, and on
+// this page the two differ by the resource tier's pixel ratio, so a frame 989 device pixels wide
+// sits inside an element 659 pixels wide.
+//
+// The sentence exists because of a fair complaint. The readout says thirty thousand splats in this
+// mode and three hundred and forty thousand out of it, and a viewer who is not told why can only
+// conclude that one of those two numbers is a lie. The mode COARSENS the cut on purpose, so that
+// the primitives are large enough to be seen at all, and saying so costs one line.
+let noteKey = '';
+function loupeNote(vw, vh) {
+  const box = el('loupe-note');
+  if (!box) return;                                  // canvas only page, e.g. the capture harness
+  const on = !!cfg.gauss && !isDirect() && !!loupeRect(vw, vh, 0);
+  const key = on ? vw + 'x' + vh + '/' + canvas.clientWidth + 'x' + canvas.clientHeight : '';
+  if (key === noteKey) return;                       // only on a resize, not every frame
+  noteKey = key;
+  box.hidden = !on;
+  if (!on) return;
+  const sx = canvas.clientWidth / Math.max(vw, 1);
+  const sy = canvas.clientHeight / Math.max(vh, 1);
+  let last = null;
+  for (let i = 0; i < LOUPE_MAG.length; i++) {
+    const lab = el('lz' + i);
+    if (!lab) continue;
+    const r = loupeRect(vw, vh, i);
+    lab.hidden = !r;
+    if (!r) continue;
+    const m = LOUPE_MAG[i];
+    lab.textContent = MULT + (m < 10 ? m.toFixed(1) : String(Math.round(m)));
+    lab.style.left = (r.x * sx + 4) + 'px';
+    lab.style.top = ((vh - r.y - r.s) * sy + 4) + 'px';
+    last = r;
+  }
+  // The sentence is set to the square's own width, and dropped when that is too narrow to read it
+  // in: at 120 CSS pixels it wraps to seven lines of three words and is a column of text rather
+  // than a caption. The squares still carry their magnification, which is the part that has to be
+  // there, and the panel's own note covers the rest.
+  const cap = el('lcap');
+  if (cap) {
+    const wide = last && last.s * sx >= 150;
+    cap.hidden = !wide;
+    if (wide) {
+      cap.style.left = (last.x * sx) + 'px';
+      cap.style.top = ((vh - last.y) * sy + 5) + 'px';
+      cap.style.width = (last.s * sx) + 'px';
+    }
+  }
 }
 
 function draw(vw, vh, count) {
@@ -6671,6 +6888,7 @@ function draw(vw, vh, count) {
   splatPass(vw, vh, count);
   tonePass(vw, vh);
   if (cfg.gauss && count > 0) drawInset(vw, vh, count);
+  loupeNote(vw, vh);
 }
 
 /* ==== src/61_pert.js ================================================== */
@@ -7911,12 +8129,17 @@ function fmt(n) {
 // except the two things a viewer actually wants while watching, plus the family parameter of
 // the Julia set, which is the whole point of having a family.
 const SLIDERS = [
-  ['s-rate', 'rate', v => v, () => cfg.rate.toFixed(2) + ' /s'],
+  // Speed is shown as a plain multiple of the default rather than in e-folds a second. The unit
+  // was on screen and was unguessable, and the number itself is only ever compared with itself.
+  ['s-rate', 'rate', v => v * RATE1, () => (cfg.rate / RATE1).toFixed(2)],
   ['s-cx', 'cx', v => v, () => cfg.cx.toFixed(3)],
   ['s-cy', 'cy', v => v, () => cfg.cy.toFixed(3)],
   ['s-power', 'power', v => Math.round(v), () => 'z^' + Math.round(cfg.power)],
 ];
 const SLIDER_INV = {};
+// The slider's own units, back from the state, so that a rate set by the query string or by a
+// preset puts the handle in the right place.
+SLIDER_INV.rate = r => r / RATE1;
 
 function syncUI() {
   if (!el('s-rate')) return;
@@ -8241,6 +8464,9 @@ function applyURL() {
   // defaults unless a query says otherwise.
   GAUSS_RING = Math.max(0.05, Math.min(4, num('rw', GAUSS_RING)));
   GAUSS_PX = Math.max(1, Math.min(40, num('gp', GAUSS_PX)));
+  // The plane objects have their own size in this mode and therefore their own query knob; see
+  // GAUSS_PX_PLANE in src/40_state.js.
+  GAUSS_PX_PLANE = Math.max(1, Math.min(60, num('gpp', GAUSS_PX_PLANE)));
   // Evaluation only: a constant added to every splat's hue, in turns. Zero everywhere except in
   // the frames of a looping zoom video. See HUE_OFF in src/40_state.js.
   HUE_OFF = num('hu', 0);
@@ -8559,6 +8785,7 @@ function frame(t) {
     fpsEma += (1 / Math.max(dt, 1e-4) - fpsEma) * 0.06;
     hudAcc += dt;
     if (hudAcc > 0.15) { hudAcc = 0; hud(vw, vh); }
+    progress();
     requestAnimationFrame(frame);
     return;
   }
@@ -8652,6 +8879,9 @@ function frame(t) {
   fpsEma += (1 / Math.max(dt, 1e-4) - fpsEma) * 0.06;
   hudAcc += dt;
   if (hudAcc > 0.15) { hudAcc = 0; hud(vw, vh); }
+  // Every frame, not on the readout's 150 ms tick: the bar is the one thing on screen whose
+  // job is to move, and at 150 ms it steps rather than fills.
+  progress();
   requestAnimationFrame(frame);
 }
 
@@ -8678,6 +8908,57 @@ function gpuName() {
   // ANGLE repeats the vendor inside the device name: "NVIDIA, NVIDIA GeForce RTX 3080".
   if (parts.length > 1 && parts[1].toLowerCase().startsWith(parts[0].toLowerCase())) parts.shift();
   return parts.join(', ') || '?';
+}
+
+/* --------------------------- the progress bar ---------------------------- */
+// Two different waits, one bar, and it says which one it is showing.
+//
+// BUILDING. A cut is spread over frames against a millisecond ceiling, so `job.ms / job.msCap`
+// is the fraction of the work this cut is ALLOWED that it has spent. It is honest, monotone
+// within a cut and bounded, and a cut that converges early simply finishes and the bar goes away.
+// The obvious alternative, splats emitted over the budget, is neither monotone nor an upper
+// bound: a converged cut can be a tenth of the budget and would sit at ten percent forever.
+//
+// SHARPENING. Once the camera stops, the ceiling doubles per level of `stillCuts` and the level
+// is reached by TIME: level k at STILL_T0 * 2^(k-1) seconds. So the honest progress is how far
+// the accumulated stillness has come toward the last level, in the log of the time, which is what
+// makes the eight steps look evenly spaced rather than one step and a very long wait.
+//
+// Neither number is drawn for an IFS object. A cut there is eight to fourteen milliseconds and a
+// bar would flash once a frame, which is noise rather than information.
+let progLast = -1, progWhat = '';
+function progress() {
+  const bar = el('prog');
+  if (!bar) return;
+  // The per pixel objects have no cut at all and their own band counter already reports their
+  // progress in the readout, so they are not in this.
+  if (!isField() || isDirect()) {
+    if (!bar.hidden) { bar.hidden = true; progLast = -1; progWhat = ''; }
+    return;
+  }
+  let u = -1, what = '';
+  if (job.active && job.msCap > 0 && job.msCap < 1e8) {
+    u = Math.min(1, job.ms / job.msCap);
+    what = 'building';
+  } else if (stillCuts < STILL_MAX && stillT > 0) {
+    // the time the last level is reached at, and where this stillness sits in the log of it
+    const tEnd = STILL_T0 * Math.pow(2, STILL_MAX - 1);
+    u = Math.min(1, Math.log2(1 + stillT / STILL_T0) / Math.log2(1 + tEnd / STILL_T0));
+    what = 'sharpening ' + (stillCuts + 1) + ' of ' + STILL_MAX;
+  }
+  if (u < 0) {
+    if (!bar.hidden) { bar.hidden = true; progLast = -1; progWhat = ''; }
+    return;
+  }
+  if (bar.hidden) bar.hidden = false;
+  // Write to the DOM only when something moved. This runs every frame and a style write that
+  // changes nothing still costs a style recalculation.
+  if (Math.abs(u - progLast) > 0.004) {
+    progLast = u;
+    const b = el('prog-b');
+    if (b) b.style.width = (u * 100).toFixed(1) + '%';
+  }
+  if (what !== progWhat) { progWhat = what; set('prog-l', what); }
 }
 
 function hud(vw, vh) {
