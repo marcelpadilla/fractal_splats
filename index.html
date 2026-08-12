@@ -160,7 +160,7 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
    floating over a dark render is a bright bar across every control and was the loudest thing in
    the frame. */
 .ctl input[type="range"] {
-  grid-column: 1 / -1; width: 100%; margin: 0; height: 16px;
+  grid-column: 1 / -1; display: block; width: 100%; margin: 0; height: 16px;
   -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
 }
 .ctl input[type="range"]::-webkit-slider-runnable-track {
@@ -178,6 +178,46 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
   width: 14px; height: 14px; border-radius: 50%;
   background: var(--fill-hi); border: 1px solid var(--rule);
 }
+/* ---- the speed track's two marks --------------------------------------------
+   A DEFAULT MARK AND A CHANGE OF SCALE, and both are read off the same mapping
+   the handle uses, through two custom properties set in src/70_ui.js.
+
+   The tick is at speed 1. It is a MARK AND NOT A DETENT: the handle slides past
+   it without catching, because a control that snaps to its default cannot be
+   used to sit just beside the default, which is most of what a speed control is
+   for (2026-08-12: "It shouldn't snap to it when you slide, but definitely, I
+   want to see a marker").
+
+   Past the knee the track lightens, and that is the only honest way to draw what
+   is happening there: the last third of the travel is worth 2x to 64x, so equal
+   distances stop meaning equal changes and the track should not go on looking
+   like they do. */
+.trk { grid-column: 1 / -1; position: relative; display: block; line-height: 0; padding-bottom: 5px; }
+.trk .tick {
+  /* UNDER the track and not across it. Across it, the mark is covered by the handle at exactly the
+     value it marks, which is the one position where a viewer looks for it to confirm where they
+     are. The input is 16px tall and the handle is 14, so there is no room inside it for a mark the
+     handle cannot reach. */
+  position: absolute; top: 15px; width: 2px; height: 5px; pointer-events: none;
+  background: var(--ink); opacity: .8;
+  /* The travel is inset by half a thumb at each end, which is where the 7px and
+     the 14px come from: the thumb is 14px wide. */
+  left: calc(6px + var(--spd-def) * (100% - 14px));   /* less half the mark, to centre it */
+}
+#s-rate::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.20) 0 var(--spd-knee),
+                                     rgba(255, 255, 255, 0.44) var(--spd-knee) 100%);
+}
+#s-rate::-moz-range-track {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.20) 0 var(--spd-knee),
+                                     rgba(255, 255, 255, 0.44) var(--spd-knee) 100%);
+}
+/* The value is a text field that looks like a number, because the slider stops
+   at 64 and the renderer does not: measured, the dragon reaches 10^2084 at speed
+   1000 with a position error of 0.000 px. Click it and type. */
+.ctl output.edit { cursor: text; outline: none; border-bottom: 1px dotted var(--rule); }
+.ctl output.edit:hover, .ctl output.edit:focus { border-bottom-color: var(--live); }
+.ctl output.edit:focus { color: var(--ink); }
 .ctl input[type="range"]:hover::-webkit-slider-thumb { background: var(--live); }
 .ctl input[type="range"]:hover::-moz-range-thumb { background: var(--live); }
 .ctl-row { display: flex; gap: 8px; align-items: stretch; }
@@ -250,9 +290,11 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
    elements positioned from the same rectangles the squares are drawn in; see
    loupeNote in src/60_gl.js, and mind that those rectangles are in DEVICE pixels.
 
-   The sentence is the point of the whole block. The readout says thirty thousand
-   splats in this mode and three hundred and forty thousand out of it, and a
-   viewer who is not told why can only conclude that one of the two is a lie. */
+   The sentence is the point of the whole block. The readout says sixteen
+   thousand splats in this mode and three hundred and forty thousand out of it,
+   and a viewer who is not told why can only conclude that one of the two is a
+   lie. Shortened to one line on 2026-08-12 at Marcel's wording: four lines of
+   monospace beside a magnified square is a paragraph where a label is wanted. */
 #loupe-note {
   position: fixed; inset: 0; pointer-events: none; z-index: 1;
   font: 400 10.5px/1.35 var(--mono);
@@ -260,7 +302,7 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
 #loupe-note[hidden] { display: none; }
 #loupe-note .lz {
   position: absolute; font-weight: 400; letter-spacing: .08em; color: var(--ink);
-  background: rgba(0, 0, 0, 0.62); border: 1px solid var(--rule); border-radius: 2px;
+  background: rgba(0, 0, 0, 0.80); border: 1px solid var(--rule); border-radius: 2px;
   padding: 0 4px 1px;
 }
 #loupe-note .lz[hidden] { display: none; }
@@ -313,8 +355,13 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
        because a play control and a speed control are one thought. Keyboard: space. -->
   <div class="ctl-row">
     <button id="btn-run" data-on="1" type="button" aria-label="pause">&#9208;</button>
-    <label class="ctl"><span>speed</span><output id="v-rate">-</output>
-      <input id="s-rate" type="range" min="0.15" max="3" step="0.01" aria-label="speed"></label>
+    <label class="ctl"><span>speed</span><output id="v-rate" class="edit" contenteditable="true"
+             inputmode="decimal" spellcheck="false" role="textbox" tabindex="0"
+             title="click to type a speed">-</output>
+      <!-- The range is the slider's POSITION, not the speed: the scale is linear to 2 and
+           geometric to 64 above it, and both pieces are in spdFromPos in src/70_ui.js. -->
+      <span class="trk"><input id="s-rate" type="range" min="0" max="1" step="0.001"
+             aria-label="speed"><i class="tick"></i></span></label>
   </div>
   <label class="ctl plane-only"><span>exponent</span><output id="v-power">-</output>
     <input id="s-power" type="range" min="2" max="8" step="1" aria-label="exponent"></label>
@@ -363,7 +410,7 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
      and hidden whenever the squares are not on screen. -->
 <div id="loupe-note" hidden>
   <b class="lz" id="lz0"></b><b class="lz" id="lz1"></b>
-  <span id="lcap">A coarser cut, drawn large on purpose. The ordinary render uses far more splats, far smaller.</span>
+  <span id="lcap">Reduced nr. of Gaussians for visibility</span>
 </div>
 
 <div id="nogl" hidden>
@@ -625,6 +672,35 @@ const IFS = {
     })(),
   },
 
+  gasket: {
+    aim: '0.1',
+    name: 'Sierpinski triangle',
+    kind: 'ifs',
+    flat: true,
+    // The tetrahedron one dimension down: three maps at ratio 1/2 onto the vertices of an
+    // equilateral triangle of circumradius 1. Dimension log3/log2 = 1.585, and the invariant
+    // covariance is exactly I/6 in the plane, so the root splat is a disc.
+    blurb: 'Three maps, contraction one half, onto the vertices of an equilateral triangle. ' +
+           'Similarity dimension log3/log2 = 1.585. No map carries a rotation, so the descent is a ' +
+           'straight magnification and every splat is the exact pushforward of its parent.',
+    hueStep: 0.085,
+    palette: [[0.98, 0.82, 0.30], [0.99, 0.55, 0.26], [0.95, 0.31, 0.42],
+              [0.72, 0.28, 0.85], [0.34, 0.42, 0.98], [0.22, 0.72, 0.96],
+              [0.24, 0.92, 0.76], [0.60, 0.97, 0.40], [0.98, 0.82, 0.30]],
+    bg: [[0.013, 0.014, 0.022], [0.028, 0.030, 0.048]],
+    view: { splitPx: 0.60, budget: 300000, density: 1.3, glow: 0.22, kernel: 3.4, sigma: 1.2,
+            fog: 0.55, yaw: 0, pitch: -1.5708 },
+    maps: (() => {
+      const h = Math.sqrt(3) / 2;
+      // Flat objects lie in the xz plane, and at pitch -pi/2 screen up is +z and screen right
+      // is -x, so this list is apex up with the base below it.
+      const v = [[0, 1], [h, -0.5], [-h, -0.5]];
+      return v.map((q, i) => spec({
+        scale: 0.5, t: [q[0] * 0.5, 0, q[1] * 0.5], p: 1 / 3, cc: (i + 0.5) / 3,
+      }));
+    })(),
+  },
+
   dragon: {
     name: 'Folded dragon',
     kind: 'ifs',
@@ -692,6 +768,44 @@ const IFS = {
           scale: 1 / 3, t: [x * 2 / 3, y * 2 / 3, z * 2 / 3], p: 1 / 8,
           cc: (i + 0.5) / 8,          // colour by which corner of the parent cube
         }));
+      }
+      return out;
+    })(),
+  },
+
+  menger: {
+    aim: '0.1',
+    name: 'Menger sponge',
+    kind: 'ifs',
+    // The 3x3x3 block with the body centre and the six face centres removed: 20 copies at ratio
+    // 1/3, the twelve edges and the eight corners. Dimension log20/log3 = 2.727, so it is nearly
+    // space filling and reads as a solid until the descent opens it. The invariant covariance is
+    // exactly 2I/5, so the splats are spheres.
+    blurb: 'Twenty copies at ratio one third, the three by three by three block with its centre ' +
+           'and its six face centres removed. Dimension log20/log3 = 2.727, the densest object ' +
+           'here. Invariant covariance exactly 2I/5, so the splats are spheres.',
+    // Drawn as a solid, which no other object here is: at dimension 2.727 every ray meets
+    // material, so summing the whole cut emissively returns a featureless block. The depth
+    // prepass keeps the front layer and the tunnels go dark. See `job.solid` in src/50_cut.js.
+    solid: true,
+    hueStep: 0.075,
+    palette: [[0.26, 0.86, 0.94], [0.30, 0.56, 1.00], [0.60, 0.36, 1.00],
+              [0.92, 0.32, 0.92], [1.00, 0.34, 0.52], [1.00, 0.58, 0.28],
+              [0.94, 0.88, 0.30], [0.48, 0.94, 0.46], [0.26, 0.86, 0.94]],
+    bg: [[0.010, 0.014, 0.024], [0.024, 0.030, 0.052]],
+    view: { splitPx: 0.65, budget: 320000, density: 1.0, glow: 0.10, kernel: 4.0, sigma: 1.0,
+            fog: 0.85, yaw: 0.62, pitch: -0.32 },
+    maps: (() => {
+      const out = [];
+      let k = 0;
+      for (let z = -1; z <= 1; z++) for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
+        // Keep a cell only where at least two coordinates are on the boundary, which is the
+        // twelve edges and the eight corners. Drops the centre and the six face centres.
+        if (Math.abs(x) + Math.abs(y) + Math.abs(z) < 2) continue;
+        out.push(spec({
+          scale: 1 / 3, t: [x * 2 / 3, y * 2 / 3, z * 2 / 3], p: 1 / 20, cc: (k + 0.5) / 20,
+        }));
+        k++;
       }
       return out;
     })(),
@@ -2347,7 +2461,10 @@ const PERF_TIERS = [
 // a guess about the device and then MEASURES; anything else is the viewer's decision and is
 // left alone, because a setting that overrides itself is not a setting.
 let perfAuto = true;
-let perfTier = 2;
+// Seeded from the guess, not from a literal. perfSet is only reached from the quality control and
+// from a q= in the query, so a plain page load never called perfGuess and every device, phone
+// included, opened at the top tier until the governor caught up.
+let perfTier = perfGuess();
 
 // The opening guess, before any frame has been timed. A coarse pointer with no hover is a
 // touch device, and `deviceMemory` is the only number a browser will admit to about the
@@ -2362,10 +2479,16 @@ function perfGuess() {
   return 2;
 }
 
+// An unknown name is treated as `auto` rather than silently leaving the tier where it was, because
+// the only source of one is a q= in the query and a typo there should not pin the governor off.
+// The measurement window is reset either way: perfFrame stops counting while perfAuto is false, so
+// without this the first window after a return to auto is judged on frames from before the change.
 function perfSet(name) {
-  perfAuto = (name === 'auto');
-  if (perfAuto) { perfTier = perfGuess(); return; }
-  for (let i = 0; i < PERF_TIERS.length; i++) if (PERF_TIERS[i].name === name) perfTier = i;
+  let tier = -1;
+  for (let i = 0; i < PERF_TIERS.length; i++) if (PERF_TIERS[i].name === name) tier = i;
+  perfAuto = (tier < 0);
+  perfTier = perfAuto ? perfGuess() : tier;
+  perfN = 0; perfBad = 0; perfGood = 0; perfWarm = 30;
 }
 function perfNow() { return PERF_TIERS[perfTier]; }
 function perfName() { return PERF_TIERS[perfTier].name + (perfAuto ? ' (auto)' : ''); }
@@ -2382,7 +2505,11 @@ function perfName() { return PERF_TIERS[perfTier].name + (perfAuto ? ' (auto)' :
 const PERF_WIN = 45;             // about three quarters of a second at 60 Hz
 const PERF_BAD = 1 / 26;         // slower than 26 fps
 const PERF_GOOD = 1 / 54;        // faster than 54 fps
-let perfN = 0, perfBad = 0, perfGood = 0, perfFloor = 0, perfWarm = 30;
+// perfCeil is the highest tier this session may still climb to. It starts at the top and drops to
+// whatever a demotion left, so a tier that has once failed is never re-entered. It is a CEILING
+// and not a floor: written as a floor the step up test could never be true, because the same
+// demotion that lowered the tier also lowered the bound, and the governor could only ever descend.
+let perfN = 0, perfBad = 0, perfGood = 0, perfCeil = PERF_TIERS.length - 1, perfWarm = 30;
 function perfFrame(dt) {
   if (!perfAuto) return;
   // The first frames of a session include shader compilation and the first cut, and they are
@@ -2396,9 +2523,9 @@ function perfFrame(dt) {
   perfN = 0; perfBad = 0; perfGood = 0;
   if (bad > 0.5 && perfTier > 0) {
     perfTier--;
-    perfFloor = perfTier;        // this session never goes back above where it failed
+    perfCeil = perfTier;         // this session never goes back above where it failed
     dirty = true;
-  } else if (good > 0.9 && perfTier < PERF_TIERS.length - 1 && perfTier < perfFloor) {
+  } else if (good > 0.9 && perfTier < perfCeil) {
     perfTier++;
     dirty = true;
   }
@@ -2535,6 +2662,25 @@ const MAXBUDGET = perfArenaBudget();
 // What speed 1 on the slider means, in e-folds a second. The default used to be 0.4 and this is
 // a little slower, which is what a descent that is being LOOKED at wants; the slider reaches 3.
 const RATE1 = 0.32;
+// THE SPEED CONTROL IS NOT A UNIFORM SCALE, and the two halves of it answer two different wants.
+//
+// Up to SPD_KNEE the scale is linear, because that is the range a descent is WATCHED in and a
+// viewer nudging it from 1 to 1.2 wants the handle to move by a fifth of the way to 2. Past the
+// knee it is geometric, because the interesting speeds up there are 8, 20, 64, and a linear track
+// spends nine tenths of its travel on values nobody picks.
+//
+// The top is high on purpose. Measured with `speed_probe.mjs`, fifteen seconds of a 60 Hz session
+// per row on the CPU where dt is handed in rather than invented by a virtual clock: the dragon
+// descends to 10^133 at speed 64 and to 10^2084 at speed 1000, in both cases with a position error
+// of 0.000 px and the full splat budget standing, because the anchor rebasing is exact and does
+// not care how many e-folds a frame covers. The Mandelbrot stops at 10^13.9 whatever the speed,
+// which is its own double-single wall and is a turn around and not a failure. Nothing NaNs at any
+// speed tried. So the control is allowed to express it.
+const SPD_MIN = 0.10;        // slowest the slider offers. Not zero: stopping is the run button
+const SPD_KNEE = 2;          // linear below here, geometric above
+const SPD_MAX = 64;          // the top of the SLIDER
+const SPD_KNEE_X = 0.62;     // and the fraction of the track the linear part is given
+const SPD_TYPED_MAX = 1000;  // the top of the TYPED value, which is the measured limit above
 let SIZE_CAP = 5.0;
 // A CONSTANT ADDED TO THE HUE OF EVERY SPLAT, in turns. Zero in every shipped frame.
 //
@@ -2702,36 +2848,49 @@ const GAUSS_CAP = 70;
 // pixel discs and nothing asks it to do better. The mode exists to make every object show
 // primitives of ONE size, and on these two objects it was doing the opposite.
 //
-// So in the Gaussian view a plane cell splits on size, exactly as a node does, and the size is
-// its own number. It has to be: a plane cell costs an escape time evaluation and an IFS node
-// costs a matrix multiply, so 2.5 px here would be a quarter of a million orbits for a mode that
-// is a demonstration rather than a render.
+// The fix is one number and it is `maxPx`: in this mode the coverage cap IS the size of the
+// primitive, so no cell may sit at 70 px merely because the field under it is flat. Nothing in
+// the split test changed.
 //
 // Measured with `gs_probe.mjs --plane`, which builds the REAL cut on the CPU at 989x1082, the
 // embed's own size, with the latency ceiling lifted so the number is about the threshold and not
 // about the clock. Both objects give the same count, and that is the point of the mode rather
-// than a bug: the criterion is size, so the tiling of a given window is the same whatever field
-// is under it.
+// than a bug: the criterion is now size, so the tiling of a given window does not depend on what
+// field is under it.
 //
-//   GAUSS_PX_PLANE   splats   levels   cell size
-//        70 (before)   1 376    5 - 6   the complaint
-//        11 to 14     12 744    8       11 to 14 px
-//         8 to 10     61 480    8 - 9
-//         7           49 184    9        5.5 to 7 px
-//         5          240 660    9 - 10
+//   GAUSS_PX_PLANE   splats   levels
+//        70 (before)   1 376    5 - 6     the complaint
+//        24            3 596    7
+//        20           15 984    7 - 8
+//        16           15 984    7 - 8
+//        12           12 744    8
+//         7           49 184    9
 //
 // The count is quantized by quadtree level, which is why it does not fall monotonically: a
 // threshold that lands mid level puts the whole cut inside the cross fade band and every parent
 // is drawn alongside its four children.
 //
-// 7 IS THE CHOICE, giving 49 184 against the 24 500 to 33 800 the iterated function systems draw
-// in the same mode, which is the same order and is what "one size on every object" has to mean
-// here. 11 would be cheaper at 12 744, and it was rejected on the picture: at 90 by 98 cells the
-// Julia boundary stops being legible through the ellipses, and a mode whose whole job is to show
-// the primitives without hiding the object has to keep the object.
+// 20 IS THE CHOICE, and the number that decided it was not the count. It was the picture, and the
+// reason is a difference between these objects and every other one in this mode that nothing here
+// had accounted for:
+//
+//   AN IFS CUT COVERS A THIN SET. A PLANE CUT TILES THE WHOLE FRAME.
+//
+// Every cell drawn in this mode carries a one sigma outline about a pixel wide, so the share of
+// the frame that is outline rather than picture is roughly the perimeter over the area, about
+// 4/cell in pixels: a fifth of the frame at 20 px, a third at 12, more than half at 7. On the
+// Sierpinski carpet at 2.5 px that share is spent on a set that occupies a fraction of the frame
+// and the object survives. On a Julia set it is spent everywhere, and at 7 and at 12 the captures
+// come back as a white mesh with the object gone. That is the same wall the outline width hit
+// when this mode was first tuned, arrived at from the other side, and there is no setting of the
+// LINE that fixes it either.
+//
+// So the plane's number is coarser than the measure objects' by a factor of eight, the count is
+// 16 000 against their 24 500 to 33 800, and the two magnified squares carry the job of showing
+// what one primitive looks like. Frames: `workbench/evaluation/2026-08-12_gauss_*`.
 // `let`, not `const`: `gs_probe.mjs` sweeps it, and `gp=` in the query sets it
 // alongside GAUSS_PX so a frame in a report can be reproduced.
-let GAUSS_PX_PLANE = 7;
+let GAUSS_PX_PLANE = 20;
 // The contour's reciprocal width, in units of the kernel value, and its colour. 26 is a line about
 // a tenth of the splat's radius across at the settings here: thin enough to read as a boundary,
 // wide enough to survive the tone map where a splat is only a few pixels.
@@ -2816,9 +2975,36 @@ const LOUPE_MAG = [3.2, 10.24];
 const MULT = String.fromCharCode(215);   // the times sign, for the squares' labels
 const LOUPE_GAP = 0.020;    // between the two squares, as a fraction of the shorter side
 const LOUPE_FRAC = 0.30;    // side of the square, as a fraction of the shorter side of the frame
-const LOUPE_MIN = 120;      // and its bounds in device pixels, so it survives a phone and a 4K panel
+const LOUPE_MIN = 100;      // and its bounds in device pixels, so it survives a phone and a 4K panel
 const LOUPE_MAX = 340;
 const LOUPE_PAD = 0.022;    // margin from the corner, same units as LOUPE_FRAC
+// HOW MANY ELLIPSES A SQUARE HAS TO SHOW ACROSS ITS WIDTH TO BE WORTH DRAWING.
+//
+// This replaces two guards that were both about whether a square FITS and neither about whether a
+// square that fits says anything, which is not the same question and on a phone is the opposite
+// one. Measured on the page's own iframe at 366x473, an iPhone 14: both squares fitted, and the
+// second showed three ellipses on a black ground while the two of them together took the right
+// hand third of the frame and half of its height. At 296x340, a 320 px phone, the frame fell four
+// pixels under a hard minimum and the mode drew no square at all, so the toggle did nothing a
+// reader could see.
+//
+// A square of side s at magnification m over a cut split at t pixels shows s/(m t) ellipses
+// across. Six and a half is the fewest that reads as a FIELD of primitives rather than as two
+// blobs, which is the whole claim the square is making. At t = 2.5 that is 52 px for the x3.2
+// square and 166 px for the x10.24 one, so a phone gets one square and a tablet gets both, and
+// nothing has to know what a phone is.
+//
+// It is stated against GAUSS_PX and not against the object's own threshold on purpose: a square
+// that appeared on the dragon and vanished on the Mandelbrot would be its own mess, and the plane
+// objects do not split on size at all (see GAUSS_PX_PLANE).
+const LOUPE_ROOM = 6.5;
+// AND THE SQUARE HAS TO CLEAR THE CONTROLS, which are pinned to the other top corner and are a
+// fixed 178 CSS px wide on a narrow page. 178 for the panel, 100 for the square at its floor, 8
+// for the margin and a few pixels of air is 292, and under that the square would be drawn
+// straight through the controls. Stated in CSS pixels and not in device pixels because that is
+// the unit the collision happens in: the panel is laid out by the stylesheet and the square is
+// drawn on a canvas whose backing store is a tier decision. See loupeRect in src/60_gl.js.
+const LOUPE_CLEAR = 292;
 // The marks: the frame around the magnified square, and the box around the region it came from.
 // Both are drawn as a white line between two black ones, which is the only marking that reads on
 // any background, and the escape time frames are exactly the case that needs it: a dense field of
@@ -3802,6 +3988,11 @@ function startJob(vw, vh) {
   const terrain = isTerrain(), plane = isPlane();
   job.active = true; job.terrain = terrain; job.plane = plane; job.ms = 0;
   job.flat = plane;
+  // An IFS whose dimension is close to 3 has to be drawn as a solid or it integrates to a
+  // block: every ray through it meets material, so an emissive sum over the whole cut hides
+  // the holes that are the object. The depth prepass keeps the front layer only; see `prepass`
+  // in finishJob. Opt in per object, because a thin attractor wants the sum.
+  job.solid = !!PRESETS[cfg.preset].solid;
   // How much of one turn of the colour ramp a plane cell may span before it is worth
   // splitting. Under this, splitting cannot change a pixel's colour.
   job.spanTol = 0.05;
@@ -4528,7 +4719,7 @@ function finishJob() {
   // both a lit terrain and a flat field want. `prepass` is separate, because the depth
   // prepass exists to keep only the front layer and a plane has exactly one layer.
   built.surface = job.terrain || job.plane;
-  built.prepass = job.terrain;
+  built.prepass = job.terrain || job.solid;
   built.norm = job.norm;
   // Published together with the count, because `draw` reads both and a cut drawn with the wrong
   // instance stride is a screen of noise rather than a subtle error.
@@ -4676,7 +4867,10 @@ function planeRoot(vw, vh) {
   // The coverage cap rises with the split threshold in the Gaussian view, or it splits every
   // large cell straight back down: it is an ABSOLUTE bound on how much of the frame one cell may
   // own, and in that view a large cell is the entire point. See GAUSS_PX.
-  job.maxPx = cfg.gauss ? GAUSS_CAP : Math.max(6, vh * PLANE_MAX_FRAC);
+  // In the Gaussian view the coverage cap IS the size of the primitive, so no cell may sit at 70
+  // px just because the field under it happens to be flat. That one number is the whole of what
+  // was wrong with this mode on these two objects; see GAUSS_PX_PLANE in src/40_state.js.
+  job.maxPx = cfg.gauss ? GAUSS_PX_PLANE : Math.max(6, vh * PLANE_MAX_FRAC);
   // THE LATENCY CEILING IS ONLY THERE TO PROTECT AGAINST LATENCY, so when the camera is not
   // moving it should not be there at all. Measured at ten to the six on a 1377x1592 window:
   // under the 90 ms ceiling a cut is 19 000 splats, and allowed to converge it is 242 000, so
@@ -5217,8 +5411,7 @@ function stepPlane(budgetMs) {
       // same lattice of primitives an IFS object does. The ramp span test is what left the
       // smooth interior of a Julia set as a handful of seventy pixel discs; see GAUSS_PX_PLANE.
       const want = pool.fp[i] > maxPx ||
-        (!over && (cfg.gauss || pool.cc[i] > tol
-                   || planeTangle(pool.M[o9i + 5], pool.M[o9i + 4], pool.M[o9i + 2])));
+        (!over && (pool.cc[i] > tol || planeTangle(pool.M[o9i + 5], pool.M[o9i + 4], pool.M[o9i + 2])));
       let split = want && pool.fp[i] > splitPx && pool.depth[i] < 200 && cutSize + 5 <= cap;
       let tbud = 1;
       if (split && bLow !== -Infinity) {
@@ -6677,13 +6870,24 @@ function tonePass(vw, vh) {
 // than a cramped pair: a magnified view that has been squeezed says less than no magnified view.
 function loupeRect(vw, vh, i) {
   const short = Math.min(vw, vh);
-  if (short < 320) return null;
   const s = Math.round(Math.max(LOUPE_MIN, Math.min(LOUPE_MAX, LOUPE_FRAC * short)));
   const pad = Math.round(LOUPE_PAD * short);
   const gap = Math.round(LOUPE_GAP * short);
-  // Room for the whole column, and never more than about three quarters of the frame's height in
-  // squares, or the corner has stopped being a corner.
-  if (i > 0 && (i + 1) * s + i * gap + 2 * pad > vh * 0.72) return null;
+  // WORTH DRAWING: enough ellipses across to read as a field rather than as two blobs. This is
+  // what decides that a phone gets one square and a tablet gets two; see LOUPE_ROOM.
+  if (s < LOUPE_ROOM * LOUPE_MAG[i] * GAUSS_PX) return null;
+  // AND NOT A LAND GRAB. LOUPE_MIN is a floor in absolute pixels, and on a small enough frame a
+  // floor stops being a floor and becomes most of the picture. Past this the square is refused
+  // outright rather than shrunk further, because a square below the floor shows too few ellipses
+  // to be a demonstration of anything. It puts the smallest frame that gets one at about 263 px,
+  // and the narrowest the project page ever gives the iframe is 296.
+  if (s > short * 0.38) return null;
+  // AND IT HAS TO CLEAR THE PANEL. The capture harness has no layout, and there are no controls
+  // there to run into, so a missing clientWidth means the frame's own width.
+  if (((canvas && canvas.clientWidth) || vw) < LOUPE_CLEAR) return null;
+  // AND IT HAS TO FIT: room for the whole column, and never more than about three quarters of the
+  // frame's height in squares, or the corner has stopped being a corner.
+  if ((i + 1) * s + i * gap + 2 * pad > vh * 0.72) return null;
   return { x: vw - pad - s, y: vh - pad - s - i * (s + gap), s };
 }
 
@@ -6839,10 +7043,10 @@ function drawInset(vw, vh, count) {
 // conclude that one of those two numbers is a lie. The mode COARSENS the cut on purpose, so that
 // the primitives are large enough to be seen at all, and saying so costs one line.
 let noteKey = '';
-function loupeNote(vw, vh) {
+function loupeNote(vw, vh, count) {
   const box = el('loupe-note');
   if (!box) return;                                  // canvas only page, e.g. the capture harness
-  const on = !!cfg.gauss && !isDirect() && !!loupeRect(vw, vh, 0);
+  const on = !!cfg.gauss && !isDirect() && count > 0 && !!loupeRect(vw, vh, 0);
   const key = on ? vw + 'x' + vh + '/' + canvas.clientWidth + 'x' + canvas.clientHeight : '';
   if (key === noteKey) return;                       // only on a resize, not every frame
   noteKey = key;
@@ -6888,7 +7092,7 @@ function draw(vw, vh, count) {
   splatPass(vw, vh, count);
   tonePass(vw, vh);
   if (cfg.gauss && count > 0) drawInset(vw, vh, count);
-  loupeNote(vw, vh);
+  loupeNote(vw, vh, count);
 }
 
 /* ==== src/61_pert.js ================================================== */
@@ -8099,6 +8303,7 @@ function attachInput(cv) {
   window.addEventListener('keydown', e => {
     const tag = e.target && e.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (e.target && e.target.isContentEditable) return;   // the typed speed, see #v-rate
     if (e.key === ' ') { cfg.autopilot = !cfg.autopilot; syncUI(); e.preventDefault(); }
     else if (e.key === 'x' || e.key === 'X') swapRepresentation();
     else if (e.key === 'g' || e.key === 'G') toggleGauss();
@@ -8128,10 +8333,29 @@ function fmt(n) {
 // This is a demo. Everything that was a knob is now a settled value carried in the preset,
 // except the two things a viewer actually wants while watching, plus the family parameter of
 // the Julia set, which is the whole point of having a family.
+// Slider position in [0, 1] to speed and back. Continuous at the knee by construction: the linear
+// piece ends at SPD_KNEE and the geometric piece starts there. spdToPos saturates at 1 rather than
+// running off the end, so a typed speed above the slider's top parks the handle at the right hand
+// stop and the number says what is really in force.
+function spdFromPos(x) {
+  x = Math.max(0, Math.min(1, x));
+  if (x <= SPD_KNEE_X) return SPD_MIN + (SPD_KNEE - SPD_MIN) * (x / SPD_KNEE_X);
+  return SPD_KNEE * Math.pow(SPD_MAX / SPD_KNEE, (x - SPD_KNEE_X) / (1 - SPD_KNEE_X));
+}
+function spdToPos(v) {
+  if (!(v > SPD_MIN)) return 0;
+  if (v <= SPD_KNEE) return SPD_KNEE_X * (v - SPD_MIN) / (SPD_KNEE - SPD_MIN);
+  return Math.min(1, SPD_KNEE_X + (1 - SPD_KNEE_X) *
+    Math.log(v / SPD_KNEE) / Math.log(SPD_MAX / SPD_KNEE));
+}
+// Three significant figures at every magnitude, in a fixed width, because the number sits in a
+// panel that must not reflow while it is being dragged.
+function fmtSpeed(v) { return v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0); }
+
 const SLIDERS = [
   // Speed is shown as a plain multiple of the default rather than in e-folds a second. The unit
   // was on screen and was unguessable, and the number itself is only ever compared with itself.
-  ['s-rate', 'rate', v => v * RATE1, () => (cfg.rate / RATE1).toFixed(2)],
+  ['s-rate', 'rate', v => spdFromPos(v) * RATE1, () => fmtSpeed(cfg.rate / RATE1)],
   ['s-cx', 'cx', v => v, () => cfg.cx.toFixed(3)],
   ['s-cy', 'cy', v => v, () => cfg.cy.toFixed(3)],
   ['s-power', 'power', v => Math.round(v), () => 'z^' + Math.round(cfg.power)],
@@ -8139,7 +8363,7 @@ const SLIDERS = [
 const SLIDER_INV = {};
 // The slider's own units, back from the state, so that a rate set by the query string or by a
 // preset puts the handle in the right place.
-SLIDER_INV.rate = r => r / RATE1;
+SLIDER_INV.rate = r => spdToPos(r / RATE1);
 
 function syncUI() {
   if (!el('s-rate')) return;
@@ -8148,7 +8372,9 @@ function syncUI() {
     const inv = SLIDER_INV[key];
     set(id, inv ? inv(cfg[key]) : cfg[key]);
     const v = el('v-' + id.slice(2));
-    if (v) v.textContent = show();
+    // Not while it is being edited. #v-rate is a text field, and rewriting its contents under a
+    // caret moves the caret to the start and makes typing come out backwards.
+    if (v && document.activeElement !== v) v.textContent = show();
   }
   const sel = el('preset');
   if (sel && sel.value !== menuValue()) sel.value = menuValue();   // a URL may override the default
@@ -8297,6 +8523,46 @@ function bindUI() {
     });
   }
 
+  // WHERE THE TWO SPEED MARKS GO. Both come from the mapping above rather than from a number
+  // typed into the stylesheet, so the tick is at the default and the shading starts at the knee
+  // however the constants are set. Custom properties inherit, so setting them on the panel serves
+  // the track pseudo element and the tick alike.
+  const panel = el('controls');
+  if (panel) {
+    panel.style.setProperty('--spd-def', spdToPos(1).toFixed(4));
+    panel.style.setProperty('--spd-knee', (SPD_KNEE_X * 100).toFixed(1) + '%');
+  }
+
+  // THE SPEED, TYPED. The slider stops at SPD_MAX and this does not, because the renderer does not
+  // (see SPD_TYPED_MAX and speed_probe.mjs) and a control that cannot say 500 when 500 works is
+  // the wrong control. Enter or clicking away commits, Escape puts back what was there, and
+  // whatever is committed is clamped and then WRITTEN BACK, so the field always shows the speed
+  // actually in force rather than the wish that was typed into it.
+  const vr = el('v-rate');
+  if (vr) {
+    let cancelled = false;
+    const commit = () => {
+      if (!cancelled) {
+        // textContent and not innerHTML: this is a contenteditable and a paste can carry markup.
+        const n = parseFloat((vr.textContent || '').replace(',', '.').replace(/[^0-9.eE+-]/g, ''));
+        if (isFinite(n)) cfg.rate = Math.max(0, Math.min(SPD_TYPED_MAX, n)) * RATE1;
+      }
+      cancelled = false;
+      dirty = true;
+      syncUI();                     // which rewrites the field, now that it is no longer focused
+    };
+    vr.addEventListener('focus', () => {
+      // Select the whole number, so that typing replaces it rather than appending to it.
+      const r = document.createRange(); r.selectNodeContents(vr);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    });
+    vr.addEventListener('blur', commit);
+    vr.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); vr.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelled = true; vr.blur(); }
+    });
+  }
+
   const rn = el('btn-run');
   if (rn) rn.addEventListener('click', () => { cfg.autopilot = !cfg.autopilot; syncUI(); });
   // The readout's second half. Splats, frame time and resolution are always on screen because
@@ -8410,7 +8676,7 @@ function applyURL() {
   cfg.fog = num('fg', cfg.fog);
   cfg.kernel = num('kn', cfg.kernel);
   cfg.sigma = num('sg', cfg.sigma);
-  cfg.rate = num('rt', cfg.rate);
+  cfg.rate = Math.max(0, Math.min(SPD_TYPED_MAX * RATE1, num('rt', cfg.rate)));
   cfg.relief = num('rl', cfg.relief);
   cfg.iters = Math.round(num('it', cfg.iters));
   // The family parameters, so a capture can be taken at an exponent or a c that is not the
@@ -8958,7 +9224,11 @@ function progress() {
     const b = el('prog-b');
     if (b) b.style.width = (u * 100).toFixed(1) + '%';
   }
-  if (what !== progWhat) { progWhat = what; set('prog-l', what); }
+  if (what !== progWhat) {
+    progWhat = what;
+    const l = el('prog-l');
+    if (l) l.textContent = what;
+  }
 }
 
 function hud(vw, vh) {
@@ -8979,7 +9249,11 @@ function hud(vw, vh) {
   } else {
     set('h-cut', 'CPU, 1 thread, ' + stats.buildMs.toFixed(0) + ' ms @ ' + hzEma.toFixed(0) + ' Hz' +
       (isField() ? ', ' + fmt(stats.evals) + ' cells, ' + fmt(stats.itersReal) + ' iters' : ''));
-    set('l-splats', 'splats');
+    // THE SPLAT COUNT SAYS WHY IT IS LOW. The caption under the magnified squares says this at
+    // length, and on a phone the caption is suppressed and the squares are small, so the one
+    // number a reader could take for a lie would be left standing alone. It belongs here anyway:
+    // the confusion is about this number, and this is where this number is.
+    set('l-splats', cfg.gauss ? 'splats (reduced)' : 'splats');
     set('h-splats', fmt(stats.splats));
   }
   set('h-object', PRESETS[cfg.preset].name);
