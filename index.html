@@ -2613,7 +2613,7 @@ const cfg = {
 // The two absolute sizes here replace the split threshold and the size cap outright, so an object
 // with a fine threshold and an object with a coarse one look the same in this mode, which is the
 // point of it.
-const GAUSS_PX = 3;
+let GAUSS_PX = 4;
 const GAUSS_CAP = 70;
 // The contour's reciprocal width, in units of the kernel value, and its colour. 26 is a line about
 // a tenth of the splat's radius across at the settings here: thin enough to read as a boundary,
@@ -2629,23 +2629,31 @@ const GAUSS_CAP = 70;
 //         4     10493        15057    36864    23492
 //         3     20195        20360    32768    31976
 //
-// 3 is the choice, and it is chosen on the two objects the viewer opens on: the dragon and the
-// Sierpinski tetrahedron both land at almost exactly twenty thousand ellipses. The carpet and the
-// Cantor cube run higher because their trees branch wider, and that is fine, they are still inside
-// the budget.
+// 4 IS THE CHOICE, and it was 3, and the correction came from a complaint about aliasing that
+// turned out to be about DENSITY as much as about the line.
 //
-// At 3 the ellipses are about six pixels across and the FULL FRAME reads as a texture rather than
-// as separable circles. That is not a failure of the setting, it is what the magnified corner is
-// for: the whole view shows how the primitives are distributed, and the corner is where they are
-// counted. Going coarser to make them separable in the full frame is the trade this mode already
-// rejected once, and it costs the distribution.
+// At 3 the ellipses are about six pixels across. A drawn outline cannot be narrower than the pixel
+// grid, so a legible one is at least a pixel wide, which on a six pixel ellipse is a third of its
+// radius; a few of them overlapping and the frame is white. Swept at 3 with outline half widths of
+// 0.25, 0.35, 0.45 and 0.75 px, all four came back as a white texture with no separable ellipse
+// anywhere in the full frame. There is no setting of the LINE that fixes that, because the problem
+// is that there is no room for a line.
+//
+// At 4 the dragon is 10.5k and the Sierpinski tetrahedron 15.1k at the opening view, the ellipses
+// are about eight pixels across, and the outlines read. That is fewer than the twenty thousand
+// this was set to, and the twenty thousand were not visible as Gaussians, which is the one thing
+// this mode exists to show.
 //
 // A WARNING about measuring this through the browser. The first version of this sweep read the
 // readout out of a headless capture and got 0 splats at fine thresholds and 5.3k for the same
 // build one run later. Neither number was real: the autopilot keeps descending for as long as the
 // virtual time budget runs, so the cut being measured was at a different point of the descent each
 // time. Pin the camera, or measure on the CPU as `gs_probe.mjs` does.
-const GAUSS_RING = 26;
+// THE OUTLINE'S HALF WIDTH, IN PIXELS. It was 26, and that was a reciprocal width in units of the
+// kernel's own value, which is a width that scales with the splat: fine at 28 pixel ellipses and
+// 0.19 px at the six pixel ones this mode draws now, which aliases into a dotted crawl. The shader
+// measures pixels with a screen space derivative now; see the note on `dp` in src/60_gl.js.
+let GAUSS_RING = 0.35;
 // How much of the splat's own colour the interior carries. The outline stays neutral. At 0.022,
 // which is what this was when the interior existed only so that overlaps would read, the tint is
 // invisible: the tone map divides accumulated colour by accumulated alpha and at that weight the
@@ -2688,10 +2696,11 @@ const LOUPE_PAD = 0.022;    // margin from the corner, same units as LOUPE_FRAC
 // single-line version these replaced had an alpha constant; it does not exist any more.
 const MARK_COL = new Float32Array([0.98, 0.94, 0.86]);
 const BLACK_COL = new Float32Array([0.0, 0.0, 0.0]);
-// Where a splat stops being drawn in this view, as a kernel value. exp(-1/2) = 0.6065 is the one
-// sigma contour, so 0.52 is about 1.09 sigma: the ellipse and a hair outside it, and none of
-// the tail that would otherwise pile up into a fog bank. See the note in the fragment shader.
-const GAUSS_CORE = 0.52;
+// Where a splat stopped being drawn in this view used to be a KERNEL VALUE, 0.52, about 1.09 sigma.
+// It cannot be one: a fixed kernel value is a fixed number of sigmas, and the outline is now a
+// fixed number of PIXELS, so on a small splat the cut fell inside the line and clipped it. The cut
+// is three line widths outside the contour, in pixels, and lives in the shader with the line it
+// belongs to. `uCore` is still a uniform because the surface depth prepass has its own use for it.
 const RING_COL = new Float32Array([1.0, 0.96, 0.88]);
 function ringWidth() { return cfg.gauss ? GAUSS_RING : 0; }
 
@@ -6069,8 +6078,8 @@ in float vPeak;
 uniform float uShape;
 uniform float uBeta2;
 uniform float uCore;
-// SHOW THE GAUSSIANS. 0 is off and costs one compare. Above zero it is the reciprocal width of the
-// contour line, in units of the kernel's own value, so a larger number is a thinner line.
+// SHOW THE GAUSSIANS. 0 is off and costs one compare. Above zero it is the half width of the
+// contour line IN PIXELS, and pixels is the whole of the fix recorded below.
 uniform float uRing;
 uniform vec3 uRingCol;
 out vec4 outColor;
@@ -6078,8 +6087,13 @@ void main() {
   float q = vConic.x * vOff.x * vOff.x + 2.0 * vConic.y * vOff.x * vOff.y
           + vConic.z * vOff.y * vOff.y;
   float e = 0.5 * pow(max(uShape * q, 1e-9), uBeta2);
-  if (e > 6.91) discard;
   float k = exp(-e);
+  // HOW FAST THE KERNEL CHANGES ACROSS ONE FRAGMENT. Taken here, at the top, and not down in the
+  // branch that uses it: a derivative asked for after a discard is undefined by the spec, and this
+  // shader discards twice below. The test is on a UNIFORM, which is the one kind of control flow a
+  // derivative may be taken inside, so the ordinary render still pays nothing for it.
+  float g = uRing > 0.0 ? max(fwidth(k), 1e-7) : 1.0;
+  if (e > 6.91) discard;
   if (k < uCore) discard;
   float a = vPeak * k;
   vec3 c = vCol;
@@ -6106,14 +6120,44 @@ void main() {
     // No backticks in this comment, and that is not a style rule. This whole shader is a JS
     // template literal, so one backtick here ends the string and the file stops parsing.
     //
-    // The TAIL is cut, by uCore, and without that this mode is a fog bank. A Gaussian reaches out
-    // to about three and a third standard deviations before the shader gives up on it, so every
-    // splat lays down a faint halo three times its own radius, and a few hundred of them overlap
-    // into a white cloud with the ellipses buried in it. Discarding just outside the one sigma
-    // contour costs nothing here: past it there is nothing this view wants to show.
-    float d = (k - 0.60653) * uRing;
-    float ring = exp(-d * d);
-    float aFill = vPeak * ${GAUSS_FILL} * k;
+    // THE LINE IS A WIDTH IN PIXELS, and it used to be a width in units of the kernel's own value.
+    // That difference is the whole of the aliasing this mode had.
+    //
+    // A contour width stated in kernel units is a width that SCALES WITH THE SPLAT. Near the one
+    // sigma contour the kernel falls by 0.6065 per sigma, so a line of w in kernel units is
+    // w * R / 0.6065 pixels wide on a splat whose one sigma radius is R pixels. That was fine while
+    // this mode drew ellipses twenty eight pixels across: at 1/26 kernel units the line came out
+    // 0.9 px and looked like a line. The same constant on the six pixel ellipses this mode draws
+    // now is 0.19 px, which is a line thinner than the grid it is being sampled on, so it turns
+    // into a dotted crawl along every boundary. That is the pixelation, and no amount of tuning the
+    // constant fixes it, because there is no one constant: the splats are not all the same size.
+    //
+    // fwidth(k) is how much the kernel changes between one fragment and the next, so (k - contour)
+    // divided by it is the signed distance to the contour measured IN FRAGMENTS. A line of a fixed
+    // number of those is the same width everywhere, on every splat, at every zoom, and inside the
+    // magnified corner as well, which is why the caller no longer scales this by the magnification.
+    // The falloff being smooth over that distance is what antialiases it: a fragment half a pixel
+    // off the contour gets half the weight, which is exactly what a good line does.
+    //
+    // The INTERIOR fades out across one pixel at the contour for the same reason. It used to end at
+    // a hard discard, and a hard edge on a tinted disc is a jagged silhouette however thin the tail
+    // behind it is. The tail itself still has to go, or a few hundred overlapping Gaussians pile up
+    // into a white fog with the ellipses buried in it; that is what the discard below does, three
+    // line widths outside the contour, where there is nothing left to draw.
+    //
+    // AND THE LINE IS NEVER DRAWN NARROWER THAN THE GRID, it is drawn DIMMER instead. Below about
+    // half a pixel a Gaussian line is narrower than the spacing of the samples taken from it, so
+    // how bright it comes out depends on where the pixel centres happen to fall across it, which
+    // is the speckle all over again in a subtler form. Widening it to the floor and scaling the
+    // amplitude by the same ratio keeps the LIGHT the line carries the same, which is what the eye
+    // integrates anyway, and makes every value of the width setting mean something.
+    float dp = (k - 0.60653) / g;
+    float w = max(uRing, 0.55);
+    if (dp < -3.0 * w) discard;
+    float t = dp / w;
+    float ring = (uRing / w) * exp(-t * t);
+    float fill = clamp(dp + 0.5, 0.0, 1.0);
+    float aFill = vPeak * ${GAUSS_FILL} * k * fill;
     float aRing = vPeak * 2.4 * ring;
     a = aFill + aRing;
     c = (vCol * aFill + uRingCol * aRing) / max(a, 1e-6);
@@ -6365,11 +6409,11 @@ function resizeTargets(w, h) {
 function splatPass(vw, vh, count, mag) {
   const m = mag ? mag.m : 1, shx = mag ? mag.x : 0, shy = mag ? mag.y : 0;
   const focal = m * 0.5 * vh / Math.tan(0.5 * cam.fov);
-  // The outline's width is set in units of the kernel's own value, so it scales with the splat and
-  // a magnified ellipse would be drawn with an outline m times thicker. Scaling the number by m
-  // keeps the outline the same width in PIXELS, which is what makes the corner read as the same
-  // drawing rather than a fatter one.
-  const ring = ringWidth() * m;
+  // NOT scaled by the magnification any more. The outline's width is now stated in pixels and the
+  // shader measures pixels with a screen space derivative, so the magnified corner gets the same
+  // line as the frame does without being told anything. It used to be a width in kernel units,
+  // which scales with the splat, and this was multiplied by m to cancel that.
+  const ring = ringWidth();
   const surface = built.surface, prepass = built.prepass;
   const zf = Math.max(2, 1 + ZF_MUL * 8 / Math.max(cfg.fog, 0.02));
   const zn = 1e-4;
@@ -6394,7 +6438,7 @@ function splatPass(vw, vh, count, mag) {
     gl.uniform1f(flatUni.uPlaneY, built.planeY);
     gl.uniform1f(flatUni.uShape, kern.shape);
     gl.uniform1f(flatUni.uBeta2, kern.beta * 0.5);
-    gl.uniform1f(flatUni.uCore, cfg.gauss ? GAUSS_CORE : 0.0);
+    gl.uniform1f(flatUni.uCore, 0.0);
     gl.uniform1f(flatUni.uRing, ring);
     gl.uniform3f(flatUni.uRingCol, RING_COL[0], RING_COL[1], RING_COL[2]);
     gl.uniform2f(flatUni.uShift, shx, shy);
@@ -6450,12 +6494,12 @@ function splatPass(vw, vh, count, mag) {
       gl.colorMask(true, true, true, true);
       gl.depthMask(false);
       gl.uniform1f(uni.uSlab, 0.0);
-      gl.uniform1f(uni.uCore, cfg.gauss ? GAUSS_CORE : 0.0);
+      gl.uniform1f(uni.uCore, 0.0);
     } else {
       gl.disable(gl.DEPTH_TEST);
       gl.depthMask(false);
       gl.uniform1f(uni.uSlab, 0.0);
-      gl.uniform1f(uni.uCore, cfg.gauss ? GAUSS_CORE : 0.0);
+      gl.uniform1f(uni.uCore, 0.0);
     }
     gl.enable(gl.BLEND);
     gl.blendEquation(gl.FUNC_ADD);
@@ -8191,6 +8235,12 @@ function applyURL() {
   // from the same arithmetic the CPU has always used. See planeFlush in src/52_cut_plane.js.
   if (q.has('gf')) gfOn = q.get('gf') === '1';
   GF_MAX_DEC = Math.max(0, Math.min(14, num('gd', GF_MAX_DEC)));
+  // Evaluation only: the Gaussian view's two shape numbers, so that "the outlines alias" can be
+  // swept and looked at instead of rebuilt four times. `rw` is the outline's half width in pixels
+  // and `gp` is the split threshold that decides how large the ellipses are. Both are the shipped
+  // defaults unless a query says otherwise.
+  GAUSS_RING = Math.max(0.05, Math.min(4, num('rw', GAUSS_RING)));
+  GAUSS_PX = Math.max(1, Math.min(40, num('gp', GAUSS_PX)));
   // Evaluation only: a constant added to every splat's hue, in turns. Zero everywhere except in
   // the frames of a looping zoom video. See HUE_OFF in src/40_state.js.
   HUE_OFF = num('hu', 0);
