@@ -13,12 +13,12 @@ Dr. Marcel Padilla, ETH Zürich &nbsp;·&nbsp; **[Open the live demo](https://ma
 
 <p align="center">
   <img src="media/sierpinski_triangle.png" alt="Sierpinski triangle" width="49%">
-  <img src="media/menger_sponge.png" alt="Menger sponge" width="49%">
+  <img src="media/cantor_cube.png" alt="Cantor cube" width="49%">
   <img src="media/mandelbrot_terrain.png" alt="Mandelbrot terrain" width="49%">
   <img src="media/julia_set.png" alt="Julia set" width="49%">
 </p>
 
-<p align="center"><sub>Sierpinski triangle, Menger sponge, Mandelbrot terrain, Julia set. Fifteen objects ship in the viewer.</sub></p>
+<p align="center"><sub>Sierpinski triangle, Cantor cube, Mandelbrot terrain, Julia set. Fourteen objects ship in the viewer.</sub></p>
 
 ## Method
 
@@ -80,9 +80,9 @@ the cut converged:
 
 | object | splats | frame |
 | --- | --- | --- |
-| Sierpinski tetrahedron | 320 000 | 17.9 ms |
-| Menger sponge | 320 000 | 19.5 ms |
-| Folded dragon | 166 000 | 19.6 ms |
+| Sierpinski tetrahedron | 320 000 | 19.1 ms |
+| Cantor cube | 268 000 | 19.5 ms |
+| Folded dragon | 166 000 | 20.1 ms |
 | Mandelbrot set, in the plane | 70 100 | 31.7 ms |
 
 The splat counts are deterministic. The frame times are measured under a virtual clock and are

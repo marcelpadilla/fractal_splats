@@ -129,39 +129,6 @@ const IFS = {
     })(),
   },
 
-  menger: {
-    aim: '0.1',
-    name: 'Menger sponge',
-    kind: 'ifs',
-    blurb: 'Twenty copies at ratio one third, the three by three by three block with its centre ' +
-           'and its six face centres removed. Dimension log20/log3 = 2.727, the densest object ' +
-           'here. Invariant covariance exactly 2I/5, so the splats are spheres.',
-    // The only object drawn solid: at dimension 2.727 every ray meets material, so summing the
-    // whole cut emissively returns a featureless block. The depth prepass keeps the front layer
-    // and lets the tunnels go dark. See `job.solid` in src/50_cut.js.
-    solid: true,
-    hueStep: 0.075,
-    palette: [[0.26, 0.86, 0.94], [0.30, 0.56, 1.00], [0.60, 0.36, 1.00],
-              [0.92, 0.32, 0.92], [1.00, 0.34, 0.52], [1.00, 0.58, 0.28],
-              [0.94, 0.88, 0.30], [0.48, 0.94, 0.46], [0.26, 0.86, 0.94]],
-    bg: [[0.010, 0.014, 0.024], [0.024, 0.030, 0.052]],
-    view: { splitPx: 0.65, budget: 320000, density: 1.0, glow: 0.10, kernel: 4.0, sigma: 1.0,
-            fog: 0.85, yaw: 0.62, pitch: -0.32 },
-    maps: (() => {
-      const out = [];
-      let k = 0;
-      for (let z = -1; z <= 1; z++) for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
-        // At least two coordinates on the boundary: the twelve edges and the eight corners.
-        if (Math.abs(x) + Math.abs(y) + Math.abs(z) < 2) continue;
-        out.push(spec({
-          scale: 1 / 3, t: [x * 2 / 3, y * 2 / 3, z * 2 / 3], p: 1 / 20, cc: (k + 0.5) / 20,
-        }));
-        k++;
-      }
-      return out;
-    })(),
-  },
-
   koch: {
     aim: '0.1',
     name: 'Koch curve',

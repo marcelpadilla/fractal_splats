@@ -7,6 +7,12 @@
 // contextified global made every builtin lookup go through an interceptor and
 // made the refinement kernel look fifteen times slower than it is, which is how
 // a wrong bottleneck ended up in the written record.
+//
+// RUN THIS ON AN OTHERWISE IDLE MACHINE. Refinement is sliced against the wall
+// clock, so a loaded CPU gives the walk less work per frame and the descent
+// checks in section 10 see a coarser cut than the thresholds were set for. On a
+// busy machine they report dark frames and fail; alone they pass. Everything
+// before section 9 is deterministic and load independent.
 import { api, get } from './harness.mjs';
 
 const {

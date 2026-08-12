@@ -1,0 +1,8 @@
+# One line ending everywhere. index.html is a build product checked in beside its sources, so a
+# checkout that rewrote endings would make it differ from what build.mjs writes and every rebuild
+# would show as a diff.
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.webp binary

@@ -70,10 +70,6 @@ function startJob(vw, vh) {
   const terrain = isTerrain(), plane = isPlane();
   job.active = true; job.terrain = terrain; job.plane = plane; job.ms = 0;
   job.flat = plane;
-  // An IFS of dimension near 3 integrates to a block: every ray meets material, so an emissive sum
-  // hides the holes that are the object. The depth prepass keeps the front layer only, see
-  // `prepass` in finishJob. Opt in per object; a thin attractor wants the sum.
-  job.solid = !!PRESETS[cfg.preset].solid;
   // How much of one turn of the colour ramp a plane cell may span before it is worth splitting.
   // Under this, splitting cannot change a pixel's colour.
   job.spanTol = 0.05;
@@ -646,9 +642,9 @@ function finishJob() {
   built.count = job.nEmit;
   // `surface` selects the opacity model, constant peak rather than conserved energy, which both a
   // lit terrain and a flat field want. `prepass` is separate: it keeps the front layer only, which
-  // the terrain and any object marked solid want and a single layer plane does not.
+  // a height field wants and a single layer plane does not.
   built.surface = job.terrain || job.plane;
-  built.prepass = job.terrain || job.solid;
+  built.prepass = job.terrain;
   built.norm = job.norm;
   // Published together with the count, because `draw` reads both and a cut drawn with the wrong
   // instance stride is a screen of noise rather than a subtle error.
