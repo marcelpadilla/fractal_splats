@@ -77,6 +77,9 @@ function attachInput(cv) {
     else if (e.key === 'x' || e.key === 'X') swapRepresentation();
     else if (e.key === 'g' || e.key === 'G') toggleGauss();
     else if (e.key === 'r' || e.key === 'R') resetView();
+    // Only when there is something to restore, so Escape never HIDES anything and never fights
+    // the browser's own use of it for leaving full screen.
+    else if (e.key === 'Escape' && uiHidden) setUIHidden(false);
   });
 }
 
@@ -158,10 +161,37 @@ function syncUI() {
     // The per pixel object has no splats, so the switch is disabled rather than silently inert.
     gb.disabled = isDirect();
   }
+  // The tool bar. The period is written like every other value except while it is being typed
+  // into, since rewriting the textContent under a caret moves the caret to the start.
+  const ab = el('btn-auto');
+  if (ab) {
+    ab.dataset.on = autoOn ? '1' : '0';
+    ab.setAttribute('aria-checked', autoOn ? 'true' : 'false');
+  }
+  const va = el('v-auto');
+  if (va && document.activeElement !== va) va.textContent = String(autoPeriod);
+  const fb = el('btn-full');
+  if (fb) {
+    const on = !!fsElement();
+    fb.dataset.fs = on ? '1' : '0';
+    fb.setAttribute('aria-label', on ? 'leave full screen' : 'full screen');
+    fb.setAttribute('title', on ? 'Leave full screen' : 'Full screen');
+  }
+  const hb = el('btn-hide');
+  if (hb) hb.setAttribute('aria-pressed', uiHidden ? 'true' : 'false');
+  const am = el('btn-aim');
+  if (am && aimList.length > 1) {
+    const at = Math.max(0, aimList.indexOf(aimIdx));
+    const nx = (at + 1) % aimList.length;
+    am.setAttribute('title', 'Aiming at the ' + (AIM_KIND[at] || 'target ' + at) +
+      '. Next: the ' + (AIM_KIND[nx] || 'target ' + nx));
+  }
   const wrap = el('controls');
   if (wrap) {
     wrap.dataset.kind = PRESETS[cfg.preset].kind;
     wrap.dataset.julia = PRESETS[cfg.preset].julia ? '1' : '0';
+    // Only where there is more than one place worth falling into.
+    wrap.dataset.aims = aimList.length > 1 ? '1' : '0';
   }
   if (el('h-object')) el('h-object').textContent = PRESETS[cfg.preset].name;
 }
@@ -217,6 +247,10 @@ function bindUI() {
   sel.addEventListener('change', () => {
     const want = (isDirect() && PIXEL_PAIR[sel.value]) ? PIXEL_PAIR[sel.value] : sel.value;
     loadPreset(want, false);
+    // A hand on the menu outranks the clock: the object just chosen gets a full period, and the
+    // walk carries on from where that object sits in the order rather than from where the timer
+    // had got to. An object outside the order gives -1, which steps to its head.
+    if (autoOn) { autoAt = autoOrder.indexOf(cfg.preset); autoT = 0; }
   });
 
   for (const [id, key, xf] of SLIDERS) {
@@ -281,6 +315,8 @@ function bindUI() {
   if (rn) rn.addEventListener('click', () => { cfg.autopilot = !cfg.autopilot; syncUI(); });
   const rs = el('btn-reset');
   if (rs) rs.addEventListener('click', resetView);
+  const am = el('btn-aim');
+  if (am) am.addEventListener('click', nextAim);
   // The readout's second half: zoom, depth range, precision, buffer format, cut cost and hardware.
   // The state lives on the panel, so the hiding is CSS.
   const ib = el('btn-info');
@@ -296,6 +332,58 @@ function bindUI() {
   if (rb) rb.addEventListener('click', swapRepresentation);
   const gb = el('btn-gauss');
   if (gb) gb.addEventListener('click', toggleGauss);
+  // Auto switch. Turning it on draws the order; turning it off leaves the object that is on
+  // screen where it is, because stopping a slideshow should not also move it.
+  const ab = el('btn-auto');
+  if (ab) ab.addEventListener('click', () => {
+    autoOn = !autoOn;
+    if (autoOn) autoShuffle(); else autoT = 0;
+    syncUI();
+  });
+  // The period, typed. Same protocol as the speed field above: Enter or blur commits, Escape
+  // restores, and what is committed is clamped and written back so the field shows the period in
+  // force. Integer seconds, because nobody wants to specify a scene change to the half second,
+  // and the count restarts on commit so a new period means what it says from now.
+  const va = el('v-auto');
+  if (va) {
+    let cancelled = false;
+    const commit = () => {
+      if (!cancelled) {
+        const n = parseFloat((va.textContent || '').replace(',', '.').replace(/[^0-9.eE+-]/g, ''));
+        if (isFinite(n)) {
+          const v = Math.max(AUTO_MIN, Math.min(AUTO_MAX, Math.round(n)));
+          // Only when it actually moved. Leaving the field is a commit whether or not anything was
+          // typed, so restarting the count unconditionally would mean that tabbing through the bar
+          // pushes the next switch a full period away every time.
+          if (v !== autoPeriod) { autoPeriod = v; autoT = 0; }
+        }
+      }
+      cancelled = false;
+      syncUI();
+    };
+    va.addEventListener('focus', () => {
+      const r = document.createRange(); r.selectNodeContents(va);
+      const sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r);
+    });
+    va.addEventListener('blur', commit);
+    va.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); va.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelled = true; va.blur(); }
+    });
+  }
+  // Full screen, and the state read back from the browser rather than remembered here: Escape
+  // and F11 leave it without going through this button, so the icon has to follow the document.
+  const fb = el('btn-full');
+  if (fb) {
+    if (!fsAvailable()) fb.hidden = true;
+    else {
+      fb.addEventListener('click', fsToggle);
+      document.addEventListener('fullscreenchange', syncUI);
+      document.addEventListener('webkitfullscreenchange', syncUI);
+    }
+  }
+  const hb = el('btn-hide');
+  if (hb) hb.addEventListener('click', () => setUIHidden(!uiHidden));
   // Anything but Auto turns the governor off. The menu is rebuilt because the bottom tier does
   // not offer the escape time objects; one already on screen stays there and only leaves the list.
   const qs = el('quality');
@@ -337,6 +425,34 @@ function resetView() {
   syncUI();
 }
 
+// The three kinds a preset names, in the order it names them. Position is the meaning: an object
+// lists its aims interior first and walks out to the tip.
+const AIM_KIND = ['interior', 'boundary', 'tip'];
+
+// Aim the descent somewhere else on the same object. It snaps back out to the opening view first,
+// because a re-aim at depth is not a re-aim: the new target is astronomically far away in units of
+// the current camera distance, so the aim invariant would drag the camera the whole way in one
+// frame and land it on nothing. Starting again from the top is what "zoom into a different place"
+// means. The speed and the run state are the viewer's and survive, as they do across an auto
+// switch; everything else about the view is the object's and is reset.
+function nextAim() {
+  if (aimList.length < 2) return;
+  const at = aimList.indexOf(aimIdx);
+  const want = aimList[((at < 0 ? 0 : at) + 1) % aimList.length];
+  const rate = cfg.rate, run = cfg.autopilot;
+  loadPreset(cfg.preset, false);       // which resets aimIdx to the head of the list
+  aimIdx = want;
+  setGoal(want);
+  cfg.rate = rate;
+  cfg.autopilot = run;
+  climbing = false;
+  projDist = 1e300;
+  paramKey = '';
+  stillT = 0; stillCuts = 0;
+  dirty = true;
+  syncUI();
+}
+
 // Swap the splat render for the per pixel one without moving the camera: the two are the same
 // field, palette, colour law and targets, so loadPreset keeps the view. `paramKey` is cleared so
 // the next frame rebuilds rather than drawing the other object's cut through this object's shader.
@@ -370,6 +486,134 @@ function toggleGauss() {
   syncUI();
 }
 
+/* ============================ the room ================================== */
+// Three controls that are about the window rather than about the object: whether the viewer
+// moves on by itself, what fills the screen, and whether there is anything on screen but the
+// render. None of them changes what is drawn, which is why they are at the opposite corner
+// from the panel that does. See #tools in page.part.html.
+
+/* ------------------------------ auto switch ------------------------------- */
+// A random order of the objects, walked and then looped, so a viewer left running shows the
+// whole set rather than the same object twice in a row. The order is drawn once when the
+// switch is turned on and kept, so what plays is a shuffled playlist and not an independent
+// coin toss each time, which is the difference between seeing everything and seeing four of
+// them repeatedly.
+//
+// THE ESCAPE TIME FIELDS ARE NOT IN IT. A plane cut is 0.4 to 9 seconds of one CPU thread
+// against 8 to 14 ms for a similarity IFS, and it goes on sharpening for twenty five seconds
+// after that, so a timed switch into the Mandelbrot or the Julia set lands on a coarse frame
+// that is still improving when the timer fires again. The Mandelbrot terrain is a field too
+// and is `hidden`, so the menu rule already excludes it.
+const AUTO_MIN = 3, AUTO_MAX = 3600;
+let autoOn = false, autoPeriod = 60, autoT = 0, autoOrder = [], autoAt = -1;
+
+// Named POSITIVELY, `kind === 'ifs'`, and not as everything that is not a plane: the second
+// form admits the Mandelbrot terrain, which is out today only because it is `hidden`, and whose
+// load alone is a 28x28 grid of field probes plus a boundary projection for each of six targets,
+// synchronously, inside the frame callback. `hidden` and `direct` are kept as well so this pool
+// can never contain something the object menu does not.
+function autoPool() {
+  return Object.keys(PRESETS).filter(k => {
+    const P = PRESETS[k];
+    return !P.hidden && !P.direct && P.kind === 'ifs';
+  });
+}
+
+// Fisher-Yates, and the walk starts at whatever is on screen: `indexOf` returns -1 for an
+// object outside the order, which is the Mandelbrot or the Julia set, and -1 steps to 0, so
+// the first switch is to the head of the order rather than past it.
+function autoShuffle() {
+  const pool = autoPool();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  autoOrder = pool;
+  autoAt = pool.indexOf(cfg.preset);
+  autoT = 0;
+}
+
+// The speed and the run state are the VIEWER's and not the object's, so both are carried
+// across by hand: loadPreset writes the new object's own view block over cfg and sets the
+// autopilot from its kind, which would silently return a projector to speed 1 and restart a
+// descent the viewer had paused. Everything else about the object is meant to change; that is
+// what the switch is for.
+function autoNext() {
+  if (!autoOrder.length) return;
+  autoAt = (autoAt + 1) % autoOrder.length;
+  const rate = cfg.rate, run = cfg.autopilot;
+  loadPreset(autoOrder[autoAt], false);
+  cfg.rate = rate;
+  cfg.autopilot = run;
+  // The flight state is the previous object's and loadPreset does not own it. Switching away
+  // from an escape time field that had turned around at its precision wall leaves `climbing`
+  // set, and the new object then opens at cam.startDist with the climb branch live: it passes
+  // the turnaround test on its first frame and calls setGoal(targetIdx + 1), throwing away the
+  // aim word the preset names on purpose.
+  climbing = false;
+  projDist = 1e300;
+  dirty = true;
+  syncUI();
+}
+
+// On the frame clock and not on an interval. requestAnimationFrame does not fire in a
+// background tab, so a timer would come back to a viewer that had switched thirty times with
+// nothing drawn and a cut queued for each; counting frames' worth of dt makes the period mean
+// seconds of RENDERED time, which is the only kind this viewer has.
+function autoTick(dt) {
+  if (!autoOn || !(autoPeriod > 0)) return;
+  autoT += dt;
+  if (autoT < autoPeriod) return;
+  autoT = 0;
+  autoNext();
+}
+
+/* ------------------------------ full screen ------------------------------- */
+// The browser's own, which is not the same thing as the project page's "Open in full screen":
+// that one promotes the iframe to a fixed overlay INSIDE the page, so the page's own chrome is
+// still around it. This one takes the display, which is the one that matters on a projector.
+// Inside an iframe it needs allowfullscreen, which the project page's iframe carries; where the
+// API is missing or the frame was embedded without it, the button is not offered at all rather
+// than offered and inert.
+function fsElement() {
+  if (typeof document === 'undefined') return null;
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+function fsAvailable() {
+  if (typeof document === 'undefined') return false;
+  const d = document.documentElement;
+  if (!d || !(d.requestFullscreen || d.webkitRequestFullscreen)) return false;
+  const en = document.fullscreenEnabled !== undefined
+    ? document.fullscreenEnabled : document.webkitFullscreenEnabled;
+  return en !== false;
+}
+function fsToggle() {
+  const d = document.documentElement;
+  if (!d) return;
+  // Both calls reject rather than throw when the gesture is not trusted or the frame is not
+  // permitted, and an unhandled rejection in a demo is a console error nobody can act on.
+  if (fsElement()) {
+    const x = document.exitFullscreen || document.webkitExitFullscreen;
+    if (x) { const r = x.call(document); if (r && r.catch) r.catch(() => {}); }
+  } else {
+    const q = d.requestFullscreen || d.webkitRequestFullscreen;
+    if (q) { const r = q.call(d); if (r && r.catch) r.catch(() => {}); }
+  }
+}
+
+/* --------------------------- the hidden interface ------------------------- */
+// The state is one attribute on the root element and the hiding itself is CSS, the same way
+// the readout's second half is hidden behind data-info. Escape restores; so does the control
+// itself, which is the only thing left on screen.
+let uiHidden = false;
+function setUIHidden(v) {
+  uiHidden = !!v;
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.setAttribute('data-ui', uiHidden ? '0' : '1');
+  }
+  syncUI();
+}
+
 // A view is named by the original frame plus the anchor word, so replay is exact: walk the same
 // sequence of maps, then write the camera, which the query already gives in the anchor's frame.
 function applyURL() {
@@ -377,6 +621,13 @@ function applyURL() {
   // The tier is read before the preset: it decides which objects are in the menu and how large
   // the first cut may be. `q=auto` is the default.
   if (q.has('q')) perfSet(q.get('q'));
+  // Auto switch, before the object is loaded and before the early return below, so a link can
+  // ask for it with or without naming an object. The order is drawn in boot(), once whatever
+  // object this query asks for is the one on screen.
+  if (q.has('ap') && isFinite(+q.get('ap'))) {
+    autoPeriod = Math.max(AUTO_MIN, Math.min(AUTO_MAX, Math.round(+q.get('ap'))));
+  }
+  if (q.has('as')) autoOn = q.get('as') === '1';
   if (!q.has('p') || !PRESETS[q.get('p')]) return false;
   const num = (k, d) => (q.has(k) && isFinite(+q.get(k))) ? +q.get(k) : d;
   loadPreset(q.get('p'), false);
@@ -627,6 +878,9 @@ function frame(t) {
   const dt = fixedDt > 0 ? fixedDt : (last ? Math.min(0.1, (t - last) / 1000) : 0.016);
   last = t;
   frameCount++;
+  // Before anything reads the object: a switch here is exactly what a change in the object menu
+  // does between two frames, and the signature test below then takes the new object's branch.
+  autoTick(dt);
 
   // The resource tier decides the pixel ratio, the pixel ceiling and the refinement slice, and
   // the governor moves the tier from the measured frame time. See src/35_perf.js.
@@ -892,6 +1146,10 @@ function boot() {
   cfg.gauss = gaussRecall();
   bindUI();
   if (!applyURL()) loadPreset(cfg.preset, false);
+  // After the object is loaded, so the walk starts from what is on screen rather than from the
+  // default preset that was there while the query was being read.
+  if (autoOn) autoShuffle();
+  setUIHidden(false);
   syncUI();
   attachInput(cv);
   requestAnimationFrame(frame);

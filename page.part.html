@@ -226,6 +226,15 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
 #controls:not([data-julia="1"]) .julia-only { display: none; }
 #controls:not([data-kind="plane"]) .plane-only { display: none; }
 
+/* Tiny, and only on the objects that name more than one aim: a second thought about a choice
+   already made, sitting right under the transport row it belongs with. Not uppercase like the
+   panel's other buttons, since a jump cut is closer to a sentence than a switch. */
+#btn-aim {
+  align-self: flex-start; margin-top: -1px; text-transform: none;
+  padding: 3px 7px; font-size: 9.5px; letter-spacing: .03em;
+}
+#controls:not([data-aims="1"]) #btn-aim { display: none; }
+
 /* ---- the readout ------------------------------------------------------------
    Three numbers always: splats, frame time, resolution. That is the project's
    rule and it is also all a viewer wants while watching. The zoom, the cut
@@ -233,7 +242,9 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
    answer a question nobody is asking during a descent, so they live behind the
    info button and are off by default. */
 #sound {
-  position: fixed; left: 0; right: 0; bottom: 0; padding: 7px 40px 8px 12px;
+  /* The right reserve is the tool bar's width and the left is the info button's, both measured
+     rather than guessed: the bar is 268 px at this font and the button is 24 px on an 8 px inset. */
+  position: fixed; left: 0; right: 0; bottom: 0; padding: 7px 284px 8px 40px;
   display: flex; flex-wrap: wrap; gap: 0 16px; pointer-events: none;
   background: linear-gradient(0deg, var(--panel), var(--panel-2) 62%, transparent);
   font: 400 11px/1.5 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink);
@@ -273,11 +284,83 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
   /* Outside #controls, so it inherits from the document rather than from the panel and came out
      black on black. Both colours are named here. */
   color: var(--ink); background: rgba(0, 0, 0, 0.55); border: 1px solid var(--rule);
-  position: fixed; right: 8px; bottom: 7px; z-index: 2;
+  /* Bottom LEFT, at the head of the readout it opens, rather than at the far end of the strip
+     from it. The bottom right is the tool bar's now. */
+  position: fixed; left: 8px; bottom: 7px; z-index: 2;
   width: 24px; height: 24px; padding: 0; border-radius: 50%;
   font: 400 13px/1 var(--mono); text-transform: none; letter-spacing: 0;
   display: grid; place-items: center;
 }
+/* ---- the tool bar -------------------------------------------------------------
+   Three controls that are about the ROOM rather than about the object, which is why
+   they are not in the panel: whether the viewer moves on by itself, what fills the
+   screen, and whether there is anything on screen but the render. The panel above is
+   the object's settings and this row is everything around it, so they are at opposite
+   corners and nothing has to be read to tell them apart.
+
+   The buttons are the document's and not the panel's, so like #btn-info they name
+   their own colours: `color: inherit` outside #controls is the document's black.
+   --------------------------------------------------------------------------- */
+#tools {
+  position: fixed; right: 8px; bottom: 7px; z-index: 2;
+  display: flex; align-items: stretch; gap: 6px;
+  font: 400 12px/1.45 var(--mono); color: var(--ink);
+}
+#tools button { color: var(--ink); background: rgba(0, 0, 0, 0.55); border: 1px solid var(--rule); }
+/* SPECIFICITY, and it is not a detail here: `#tools button` carries an id and outranks the
+   panel's own `button[data-on="1"]` and `button:hover`, so without these three lines the auto
+   switch would have no visible on state at all and nothing in the bar would answer the pointer.
+   A switch whose state cannot be seen reads as an action, which is the whole argument in the
+   note on the two sliding switches above. */
+#tools button[data-on="1"] { background: var(--fill); border-color: var(--fill); color: var(--on-fill); }
+#tools button[data-on="1"]:hover { background: var(--fill-hi); border-color: var(--fill-hi); color: var(--on-fill); }
+#tools button:not([data-on="1"]):hover:not(:disabled) { border-color: var(--live); color: var(--live); }
+/* The period, beside its switch rather than inside it: a field that takes a caret cannot live in
+   a button, where every click would toggle the thing it is trying to edit. Same chip as the
+   button next to it so the two read as one control. */
+#tools .num {
+  display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55); border: 1px solid var(--rule);
+  font-size: 11px; letter-spacing: .06em;
+}
+#tools .num i { font-style: normal; color: var(--dim); }
+#tools .num output {
+  color: var(--live); font-variant-numeric: tabular-nums;
+  min-width: 2ch; text-align: right; cursor: text; outline: none;
+  border-bottom: 1px dotted var(--rule);
+}
+#tools .num output:hover, #tools .num output:focus { border-bottom-color: var(--live); }
+#tools .num output:focus { color: var(--ink); }
+/* The full screen icon is the four corner brackets every player and map uses, drawn rather than
+   set in a font: there is no font in this viewer and two glyphs are not a reason to load one.
+   Both states are in the markup and the attribute chooses; `data-fs` and not `data-on`, so the
+   panel's filled-button rule does not paint "you are in full screen" in the accent red. */
+#btn-full { padding: 0; width: 30px; display: grid; place-items: center; }
+#btn-full svg { display: block; width: 15px; height: 15px; }
+#btn-full .fs-out, #btn-full[data-fs="1"] .fs-in { display: none; }
+#btn-full[data-fs="1"] .fs-out { display: block; }
+/* Nothing to offer when the API is missing or the frame was embedded without allowfullscreen. */
+#btn-full[hidden] { display: none; }
+
+/* ---- the hidden interface ----------------------------------------------------
+   Everything goes except the control that undoes it, which stays exactly where it
+   was at low opacity. A control that vanished with the rest would leave a viewer
+   with a full screen render and no way back but the keyboard, and someone who has
+   just hidden the interface is the last person who should have to guess a key.
+   Hovering or focusing it brings it back to full strength, so it is a ghost to the
+   room and an ordinary button to the hand. Escape restores as well; see the keydown
+   handler in src/70_ui.js.
+   --------------------------------------------------------------------------- */
+:root[data-ui="0"] #controls,
+:root[data-ui="0"] #sound,
+:root[data-ui="0"] #btn-info,
+:root[data-ui="0"] #btn-auto,
+:root[data-ui="0"] #tools .num,
+:root[data-ui="0"] #btn-full,
+:root[data-ui="0"] #loupe-note { display: none; }
+:root[data-ui="0"] #btn-hide { opacity: .45; }
+:root[data-ui="0"] #btn-hide:hover, :root[data-ui="0"] #btn-hide:focus-visible { opacity: 1; }
+
 /* ---- the magnified squares' captions ----------------------------------------
    Text, over a canvas that has no text in it. There is no font in this renderer
    and no reason to add one for two labels and a sentence, so these are ordinary
@@ -320,14 +403,20 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
    line of monospace that runs off the edge reports nothing at all. */
 @media (max-width: 620px) {
   #controls { width: 178px; padding: 8px 9px 10px; gap: 6px; font-size: 11px; }
-  #sound { font-size: 10px; gap: 0 10px; padding: 6px 36px 7px 9px; }
+  /* Reserving 284 px beside the bar leaves nothing on a phone, so the readout goes ABOVE it
+     instead and the strip grows a bar's height of bottom padding. The gradient still runs to the
+     bottom of the window, so the bar and the info button sit on the dark end of it. */
+  #sound { font-size: 10px; gap: 0 10px; padding: 6px 10px 38px 36px; }
   #sound .narrow-hide { display: none; }
+  #tools { gap: 4px; }
+  #tools button, #tools .num { padding: 5px 7px; font-size: 10px; }
+  #btn-full { width: 26px; padding: 0; }
 }
 </style>
 
 <canvas id="gl"></canvas>
 
-<div id="controls" data-kind="plane" data-julia="0" data-info="0">
+<div id="controls" data-kind="plane" data-julia="0" data-info="0" data-aims="0">
   <select id="preset" aria-label="object"></select>
   <!-- What the machine is allowed to spend. Auto measures the frame time and steps itself down;
        anything else is the viewer's decision and is then left alone. -->
@@ -363,6 +452,13 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
       <span class="trk"><input id="s-rate" type="range" min="0" max="1" step="0.001"
              aria-label="speed"><i class="tick"></i></span></label>
   </div>
+  <!-- Where the descent aims, for the objects that name more than one place worth falling into.
+       The order is interior, boundary, tip: the default is the one that keeps structure on every
+       side of the frame, and this walks out to the ones that do not, which is the whole point of
+       offering it. Measured, not chosen by eye; see the note above IFS in src/20_ifs.js. Hangs
+       under the transport row rather than the object picker: it is a jump cut in the same camera,
+       so it reads as one more thing play/pause and reset do, not as a property of the object. -->
+  <button id="btn-aim" type="button">New target</button>
   <label class="ctl plane-only"><span>exponent</span><output id="v-power">-</output>
     <input id="s-power" type="range" min="2" max="8" step="1" aria-label="exponent"></label>
   <!-- The family parameter, as two sliders on one line. c is ONE complex number and splitting it
@@ -405,6 +501,32 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
   <div id="prog" hidden><i id="prog-l">building</i><span class="track"><b id="prog-b"></b></span></div>
 </div>
 <button id="btn-info" type="button" aria-label="more numbers" title="more numbers">i</button>
+
+<!-- The room's controls, at the corner opposite the object's panel. Auto switch walks a random
+     order of the objects so the viewer can be left running on a projector; the escape time fields
+     are not in that order, since a plane cut is hundreds of milliseconds to seconds against 8 to
+     14 ms for an iterated function system and a timed switch would land on a frame still
+     sharpening. Full screen is the browser's, not the project page's overlay. Hide UI leaves
+     nothing but the render and itself. -->
+<div id="tools">
+  <button id="btn-auto" type="button" role="switch" aria-checked="false"
+          title="Walk the objects in a random order, one every so many seconds">Auto switch</button>
+  <span class="num"><output id="v-auto" contenteditable="true" inputmode="numeric"
+        spellcheck="false" role="textbox" tabindex="0"
+        title="Seconds on each object; click to type">60</output><i>s</i></span>
+  <button id="btn-full" type="button" aria-label="full screen" title="Full screen">
+    <svg class="fs-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>
+    </svg>
+    <svg class="fs-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>
+    </svg>
+  </button>
+  <button id="btn-hide" type="button" aria-pressed="false"
+          title="Hide everything but the render. Escape brings it back">Hide UI</button>
+</div>
 
 <!-- Captions for the two magnified squares. Positioned by loupeNote in src/70_ui.js's frame loop
      and hidden whenever the squares are not on screen. -->

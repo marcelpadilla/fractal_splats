@@ -248,6 +248,10 @@ const anchor = {
 // `targets` holds [x, z] for a field preset and { word } for an IFS, discriminated in setGoal by
 // the preset kind.
 let maps = null, root = null, targets = [], targetIdx = 0, aimIdx = 0, suppR = 4, suppE = 1;
+// Indices into `targets` of the words the preset names, in the order it names them, which is
+// interior first and then out to the tip. The New target button walks this list; an object that
+// names only one word does not get the button. See the note above IFS in src/20_ifs.js.
+let aimList = [];
 let mapA = null, mapD = null, mapP = null, mapS = null, mapSc = null, mapCC = null, mapLS = null;
 let mapHue = null;
 let mDim = 2, conformal = false, terrHMax = 1;
@@ -668,6 +672,15 @@ function loadPreset(id, keepView) {
     for (let i = 0; i + 1 < maps.length; i++) {
       if (fixWord(maps, [i, i + 1])) targets.push({ word: [i, i + 1] });
     }
+    // The words the preset names, which are longer than either generated family: an aim that sees
+    // structure on every side is three or four letters, and the two above are one and two. Added
+    // only when the generated list does not already hold them.
+    for (const w of aimWords(P)) {
+      const word = w.split('.').map(Number);
+      if (!word.length || word.some(i => !(i >= 0 && i < maps.length))) continue;
+      if (targets.some(t => t.word && t.word.join('.') === w)) continue;
+      if (fixWord(maps, word)) targets.push({ word });
+    }
   }
   // Which target a descent starts on. The fixed point of a single map is a vertex or corner of
   // most of these attractors, and zooming into a corner frames badly: the piece hangs off one side
@@ -675,11 +688,13 @@ function loadPreset(id, keepView) {
   // surrounds the aim. Named per object, since the folded dragon's single map fixed point is
   // inside its sheet.
   aimIdx = 0;
-  if (P.aim !== undefined) {
+  aimList = [];
+  for (const w of aimWords(P)) {
     for (let i = 0; i < targets.length; i++) {
-      if (targets[i].word && targets[i].word.join('.') === P.aim) { aimIdx = i; break; }
+      if (targets[i].word && targets[i].word.join('.') === w) { aimList.push(i); break; }
     }
   }
+  if (aimList.length) aimIdx = aimList[0];
 
   if (!keepView) {
     // Only the escape time fields open still. Their cut costs hundreds of milliseconds and goes on
@@ -727,6 +742,13 @@ function loadPreset(id, keepView) {
   orthoBasis();
   dirty = true;
   syncUI();
+}
+
+// What a preset names as its descent aims. `aims` is the measured list, interior first; `aim` is
+// the older single word form. Both are strings of map indices joined by dots.
+function aimWords(P) {
+  if (Array.isArray(P.aims)) return P.aims;
+  return P.aim !== undefined ? [P.aim] : [];
 }
 
 function setGoal(i) {

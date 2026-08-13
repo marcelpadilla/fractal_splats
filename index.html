@@ -235,6 +235,15 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
 #controls:not([data-julia="1"]) .julia-only { display: none; }
 #controls:not([data-kind="plane"]) .plane-only { display: none; }
 
+/* Tiny, and only on the objects that name more than one aim: a second thought about a choice
+   already made, sitting right under the transport row it belongs with. Not uppercase like the
+   panel's other buttons, since a jump cut is closer to a sentence than a switch. */
+#btn-aim {
+  align-self: flex-start; margin-top: -1px; text-transform: none;
+  padding: 3px 7px; font-size: 9.5px; letter-spacing: .03em;
+}
+#controls:not([data-aims="1"]) #btn-aim { display: none; }
+
 /* ---- the readout ------------------------------------------------------------
    Three numbers always: splats, frame time, resolution. That is the project's
    rule and it is also all a viewer wants while watching. The zoom, the cut
@@ -242,7 +251,9 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
    answer a question nobody is asking during a descent, so they live behind the
    info button and are off by default. */
 #sound {
-  position: fixed; left: 0; right: 0; bottom: 0; padding: 7px 40px 8px 12px;
+  /* The right reserve is the tool bar's width and the left is the info button's, both measured
+     rather than guessed: the bar is 268 px at this font and the button is 24 px on an 8 px inset. */
+  position: fixed; left: 0; right: 0; bottom: 0; padding: 7px 284px 8px 40px;
   display: flex; flex-wrap: wrap; gap: 0 16px; pointer-events: none;
   background: linear-gradient(0deg, var(--panel), var(--panel-2) 62%, transparent);
   font: 400 11px/1.5 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink);
@@ -282,11 +293,83 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
   /* Outside #controls, so it inherits from the document rather than from the panel and came out
      black on black. Both colours are named here. */
   color: var(--ink); background: rgba(0, 0, 0, 0.55); border: 1px solid var(--rule);
-  position: fixed; right: 8px; bottom: 7px; z-index: 2;
+  /* Bottom LEFT, at the head of the readout it opens, rather than at the far end of the strip
+     from it. The bottom right is the tool bar's now. */
+  position: fixed; left: 8px; bottom: 7px; z-index: 2;
   width: 24px; height: 24px; padding: 0; border-radius: 50%;
   font: 400 13px/1 var(--mono); text-transform: none; letter-spacing: 0;
   display: grid; place-items: center;
 }
+/* ---- the tool bar -------------------------------------------------------------
+   Three controls that are about the ROOM rather than about the object, which is why
+   they are not in the panel: whether the viewer moves on by itself, what fills the
+   screen, and whether there is anything on screen but the render. The panel above is
+   the object's settings and this row is everything around it, so they are at opposite
+   corners and nothing has to be read to tell them apart.
+
+   The buttons are the document's and not the panel's, so like #btn-info they name
+   their own colours: `color: inherit` outside #controls is the document's black.
+   --------------------------------------------------------------------------- */
+#tools {
+  position: fixed; right: 8px; bottom: 7px; z-index: 2;
+  display: flex; align-items: stretch; gap: 6px;
+  font: 400 12px/1.45 var(--mono); color: var(--ink);
+}
+#tools button { color: var(--ink); background: rgba(0, 0, 0, 0.55); border: 1px solid var(--rule); }
+/* SPECIFICITY, and it is not a detail here: `#tools button` carries an id and outranks the
+   panel's own `button[data-on="1"]` and `button:hover`, so without these three lines the auto
+   switch would have no visible on state at all and nothing in the bar would answer the pointer.
+   A switch whose state cannot be seen reads as an action, which is the whole argument in the
+   note on the two sliding switches above. */
+#tools button[data-on="1"] { background: var(--fill); border-color: var(--fill); color: var(--on-fill); }
+#tools button[data-on="1"]:hover { background: var(--fill-hi); border-color: var(--fill-hi); color: var(--on-fill); }
+#tools button:not([data-on="1"]):hover:not(:disabled) { border-color: var(--live); color: var(--live); }
+/* The period, beside its switch rather than inside it: a field that takes a caret cannot live in
+   a button, where every click would toggle the thing it is trying to edit. Same chip as the
+   button next to it so the two read as one control. */
+#tools .num {
+  display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55); border: 1px solid var(--rule);
+  font-size: 11px; letter-spacing: .06em;
+}
+#tools .num i { font-style: normal; color: var(--dim); }
+#tools .num output {
+  color: var(--live); font-variant-numeric: tabular-nums;
+  min-width: 2ch; text-align: right; cursor: text; outline: none;
+  border-bottom: 1px dotted var(--rule);
+}
+#tools .num output:hover, #tools .num output:focus { border-bottom-color: var(--live); }
+#tools .num output:focus { color: var(--ink); }
+/* The full screen icon is the four corner brackets every player and map uses, drawn rather than
+   set in a font: there is no font in this viewer and two glyphs are not a reason to load one.
+   Both states are in the markup and the attribute chooses; `data-fs` and not `data-on`, so the
+   panel's filled-button rule does not paint "you are in full screen" in the accent red. */
+#btn-full { padding: 0; width: 30px; display: grid; place-items: center; }
+#btn-full svg { display: block; width: 15px; height: 15px; }
+#btn-full .fs-out, #btn-full[data-fs="1"] .fs-in { display: none; }
+#btn-full[data-fs="1"] .fs-out { display: block; }
+/* Nothing to offer when the API is missing or the frame was embedded without allowfullscreen. */
+#btn-full[hidden] { display: none; }
+
+/* ---- the hidden interface ----------------------------------------------------
+   Everything goes except the control that undoes it, which stays exactly where it
+   was at low opacity. A control that vanished with the rest would leave a viewer
+   with a full screen render and no way back but the keyboard, and someone who has
+   just hidden the interface is the last person who should have to guess a key.
+   Hovering or focusing it brings it back to full strength, so it is a ghost to the
+   room and an ordinary button to the hand. Escape restores as well; see the keydown
+   handler in src/70_ui.js.
+   --------------------------------------------------------------------------- */
+:root[data-ui="0"] #controls,
+:root[data-ui="0"] #sound,
+:root[data-ui="0"] #btn-info,
+:root[data-ui="0"] #btn-auto,
+:root[data-ui="0"] #tools .num,
+:root[data-ui="0"] #btn-full,
+:root[data-ui="0"] #loupe-note { display: none; }
+:root[data-ui="0"] #btn-hide { opacity: .45; }
+:root[data-ui="0"] #btn-hide:hover, :root[data-ui="0"] #btn-hide:focus-visible { opacity: 1; }
+
 /* ---- the magnified squares' captions ----------------------------------------
    Text, over a canvas that has no text in it. There is no font in this renderer
    and no reason to add one for two labels and a sentence, so these are ordinary
@@ -329,14 +412,20 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
    line of monospace that runs off the edge reports nothing at all. */
 @media (max-width: 620px) {
   #controls { width: 178px; padding: 8px 9px 10px; gap: 6px; font-size: 11px; }
-  #sound { font-size: 10px; gap: 0 10px; padding: 6px 36px 7px 9px; }
+  /* Reserving 284 px beside the bar leaves nothing on a phone, so the readout goes ABOVE it
+     instead and the strip grows a bar's height of bottom padding. The gradient still runs to the
+     bottom of the window, so the bar and the info button sit on the dark end of it. */
+  #sound { font-size: 10px; gap: 0 10px; padding: 6px 10px 38px 36px; }
   #sound .narrow-hide { display: none; }
+  #tools { gap: 4px; }
+  #tools button, #tools .num { padding: 5px 7px; font-size: 10px; }
+  #btn-full { width: 26px; padding: 0; }
 }
 </style>
 
 <canvas id="gl"></canvas>
 
-<div id="controls" data-kind="plane" data-julia="0" data-info="0">
+<div id="controls" data-kind="plane" data-julia="0" data-info="0" data-aims="0">
   <select id="preset" aria-label="object"></select>
   <!-- What the machine is allowed to spend. Auto measures the frame time and steps itself down;
        anything else is the viewer's decision and is then left alone. -->
@@ -372,6 +461,13 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
       <span class="trk"><input id="s-rate" type="range" min="0" max="1" step="0.001"
              aria-label="speed"><i class="tick"></i></span></label>
   </div>
+  <!-- Where the descent aims, for the objects that name more than one place worth falling into.
+       The order is interior, boundary, tip: the default is the one that keeps structure on every
+       side of the frame, and this walks out to the ones that do not, which is the whole point of
+       offering it. Measured, not chosen by eye; see the note above IFS in src/20_ifs.js. Hangs
+       under the transport row rather than the object picker: it is a jump cut in the same camera,
+       so it reads as one more thing play/pause and reset do, not as a property of the object. -->
+  <button id="btn-aim" type="button">New target</button>
   <label class="ctl plane-only"><span>exponent</span><output id="v-power">-</output>
     <input id="s-power" type="range" min="2" max="8" step="1" aria-label="exponent"></label>
   <!-- The family parameter, as two sliders on one line. c is ONE complex number and splitting it
@@ -414,6 +510,32 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
   <div id="prog" hidden><i id="prog-l">building</i><span class="track"><b id="prog-b"></b></span></div>
 </div>
 <button id="btn-info" type="button" aria-label="more numbers" title="more numbers">i</button>
+
+<!-- The room's controls, at the corner opposite the object's panel. Auto switch walks a random
+     order of the objects so the viewer can be left running on a projector; the escape time fields
+     are not in that order, since a plane cut is hundreds of milliseconds to seconds against 8 to
+     14 ms for an iterated function system and a timed switch would land on a frame still
+     sharpening. Full screen is the browser's, not the project page's overlay. Hide UI leaves
+     nothing but the render and itself. -->
+<div id="tools">
+  <button id="btn-auto" type="button" role="switch" aria-checked="false"
+          title="Walk the objects in a random order, one every so many seconds">Auto switch</button>
+  <span class="num"><output id="v-auto" contenteditable="true" inputmode="numeric"
+        spellcheck="false" role="textbox" tabindex="0"
+        title="Seconds on each object; click to type">60</output><i>s</i></span>
+  <button id="btn-full" type="button" aria-label="full screen" title="Full screen">
+    <svg class="fs-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>
+    </svg>
+    <svg class="fs-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>
+    </svg>
+  </button>
+  <button id="btn-hide" type="button" aria-pressed="false"
+          title="Hide everything but the render. Escape brings it back">Hide UI</button>
+</div>
 
 <!-- Captions for the two magnified squares. Positioned by loupeNote in src/70_ui.js's frame loop
      and hidden whenever the squares are not on screen. -->
@@ -633,11 +755,32 @@ function spec(o) {
   return { A: B, b: new Float64Array(o.t), p: o.p === undefined ? 1 : o.p, cc: o.cc };
 }
 
+// WHERE A DESCENT AIMS, and it is measured rather than chosen by eye. The aim is the fixed point
+// of a word, so the attractor around it is exactly self similar under that word's map and the
+// picture at radius r is the picture at radius r*s: one measurement is the whole descent. The
+// number that decides whether the zoom looks right is the largest ANGULAR GAP around the aim in
+// the view plane, from a four million point chaos game binned at two degrees over three radii. A
+// gap near 360 means the structure hangs off one side and the rest of the frame stays black.
+//
+// The metric was checked against a human before it was used: every object called badly framed
+// measured 178 degrees or more, the one called good measured 36, and the ones nobody mentioned
+// measured 0 to 102.
+//
+// It fights the colour. A word that sees structure on every side is one that visits every map
+// about equally, and the per map hue increments have zero measure weighted mean, so exactly those
+// words drift nowhere and the object holds one colour for the whole zoom. Every aim below is the
+// best gap among words that still carry at least 0.07 turns of hue per decade, which is why they
+// are three and four letters rather than the shortest word that frames well.
+//
+// `aims` is [interior, boundary, tip], in that order: the first is the default, and the New target
+// button in the panel cycles them. `aim` is the older single word form and still works.
 const IFS = {
   sierpinski: {
-    // A single map's fixed point satisfies x = 0.5x + 0.5q, so the aim is the vertex q, and the
-    // structure hangs off one side of the frame rather than surrounding the camera.
-    aim: '0',
+    // Was the vertex q, the fixed point of a single map, which left 294 degrees of the frame
+    // empty. The three letter word visits three of the four pieces, so its fixed point is down in
+    // the middle of the tetrahedron: 0 degrees empty, and the hue still travels 0.089 turns a
+    // decade. See the note on aims above.
+    aims: ['2.3.1', '0.3.0', '0'],
     name: 'Sierpinski tetrahedron',
     kind: 'ifs',
     blurb: 'Four maps, contraction one half, no rotation. Ground truth: the attractor and its invariant ' +
@@ -664,7 +807,12 @@ const IFS = {
   },
 
   gasket: {
-    aim: '0.1',
+    // The two letter word sits on an OUTER edge, so the exterior half plane is black: 180
+    // degrees. A four letter word that visits all three pieces with one repeated lands inside the
+    // gasket, 0 degrees empty, and the repeat is what keeps the hue moving: a word that visits
+    // every map equally has exactly zero net hue, since the increments have zero measure weighted
+    // mean. 0.071 turns a decade against the old 0.141.
+    aims: ['0.0.1.2', '0.1', '0'],
     name: 'Sierpinski triangle',
     kind: 'ifs',
     flat: true,
@@ -691,6 +839,13 @@ const IFS = {
   },
 
   dragon: {
+    // Had no second or third target at all. '0.0.1' measures 12 degrees empty against 106 for the
+    // lone map, at 0.133 turns a decade; '1', the other map alone, is the mirror corner of the
+    // sheet the first map's fixed point already opens on, 38 degrees and the loop's best hue
+    // travel at 0.399. The two letter word '0.1' frames tighter still, 4 degrees, but visits both
+    // maps once each and their increments are exactly opposite, so it holds one colour for the
+    // whole descent; see the note on the terdragon's old middle piece below.
+    aims: ['0', '0.0.1', '1'],
     name: 'Folded dragon',
     kind: 'ifs',
     // The Heighway curve tiles the plane, so its similarity dimension is exactly 2, and tilting
@@ -718,7 +873,10 @@ const IFS = {
   },
 
   cantor: {
-    aim: '0.1',
+    // 178 degrees empty at the old two letter word. Descending twice into one corner and once
+    // into another lands between the cubes rather than on the outside of them: 0 degrees, and the
+    // hue travel is unchanged at 0.153 turns a decade against 0.162.
+    aims: ['2.0.0', '0.1', '1'],
     name: 'Cantor cube',
     kind: 'ifs',
     blurb: 'The middle thirds Cantor set cubed: eight corner copies at ratio one third. Dimension ' +
@@ -745,7 +903,11 @@ const IFS = {
   },
 
   koch: {
-    aim: '0.1',
+    // '0.1' is the joint the curve opens on, 198 degrees empty: a thread rather than a cloud, so
+    // nothing here reaches the near zero degrees the fatter objects do. '2', one of the two tilted
+    // middle maps, is the best of them at 130, just clearing the hue floor at 0.070. '0', the outer
+    // untilted map, sits at the initiator's own endpoint and measures 330: the curve's actual tip.
+    aims: ['0.1', '2', '0'],
     name: 'Koch curve',
     kind: 'ifs',
     // Planar, so it sits in the 2D group of the picker and the autopilot must not turn it: a
@@ -786,7 +948,11 @@ const IFS = {
   },
 
   vicsek: {
-    aim: '0.1',
+    // The centre map alone frames tightest of all, 38 degrees, but its cc sits exactly on the
+    // measure weighted mean by symmetry so it carries zero hue: same trap as the dragon's '0.1'.
+    // '0.5', one step off centre into an arm, is the best word that still clears the hue floor, 28
+    // degrees at 0.092. '6', the opposite arm's own tip, measures 172 at 0.184.
+    aims: ['0.1', '0.5', '6'],
     name: 'Vicsek cross',
     kind: 'ifs',
     blurb: 'The centre cell of a three by three by three block plus its six face neighbours, ratio one ' +
@@ -824,9 +990,17 @@ const IFS = {
   // fixed number of primitives at a fixed screen size, so nothing here has dimension over 2.
 
   terdragon: {
-    // The middle piece: its fixed point is interior to the sheet rather than at an end of the
-    // curve, so the structure surrounds the aim from the first frame.
-    aim: '1',
+    // THE MIDDLE PIECE WAS BOTH PROBLEMS AT ONCE. Its hue increment is exactly zero, because
+    // three equal maps whose colour coordinates are symmetric put the middle one on the weighted
+    // mean, and the descent adds that increment once per rebase: measured, 0.000 turns a decade
+    // where every other object here runs 0.11 to 0.40, which is why the terdragon held one blue
+    // for the whole zoom. It was not interior either, whatever the old note said: 204 degrees of
+    // the frame empty. One level into an outer piece and one into the middle fixes both, 0 degrees
+    // empty and 0.147 turns a decade, without touching the palette. `0.0.1` travels further
+    // through the ramp, 0.196, but it also lifts the descent's median brightness 5.5 times, and
+    // then the OPENING frame reads as dark against it at a fifth of the median even though it is
+    // brighter in absolute terms than anything the old aim ever drew. See section 10.
+    aims: ['1.0', '2.1.2', '2'],
     name: 'Folded terdragon',
     kind: 'ifs',
     // Three similarities of ratio 1/sqrt(3), hexagonal where the Heighway dragon is square. The
@@ -889,7 +1063,9 @@ const IFS = {
   levy: {
     // A one letter word, so the aim sits at an end of the curve: the two letter word's multiplier
     // is (e^(i45)/sqrt2)(e^(-i45)/sqrt2) = 1/2 exactly, and this object is here for the spiral.
-    aim: '0',
+    // '0.1.1' is the best framed word short of that cancellation, 32 degrees at 0.133 turns a
+    // decade. '1', the far end of the curve from '0', mirrors it at 154 degrees.
+    aims: ['0', '0.1.1', '1'],
     name: 'Levy C curve',
     kind: 'ifs',
     flat: true,
@@ -919,7 +1095,11 @@ const IFS = {
   },
 
   pythagoras: {
-    aim: '0',
+    // '0' is the long branch's own fixed point, kept for the spiral: see the lean note below. Two
+    // unequal maps frame worse than the other objects here at any short word; the best that still
+    // clears the hue floor is '0.1.1', 52 degrees at 0.160. '1', the short branch's own tip,
+    // mirrors '0' at 180.
+    aims: ['0', '0.1.1', '1'],
     name: 'Pythagoras tree',
     kind: 'ifs',
     flat: true,
@@ -971,7 +1151,10 @@ const IFS = {
   },
 
   pentaflake: {
-    aim: '0.1',
+    // 180 degrees empty on the outer edge of the flake. Twice into one arm and once into the
+    // one across lands among the pentagons instead of outside them: 6 degrees, 0.136 turns a
+    // decade against 0.153.
+    aims: ['0.2.0', '0.1', '2'],
     name: 'Pentaflake',
     kind: 'ifs',
     flat: true,
@@ -1004,7 +1187,10 @@ const IFS = {
   },
 
   carpet: {
-    aim: '0.1',
+    // 180 degrees empty, the old aim being on the carpet's own outer edge. Twice into a corner
+    // square and once into the far side puts the aim inside: 0 degrees, 0.117 turns a decade
+    // against 0.162.
+    aims: ['0.0.4', '1', '2'],
     name: 'Sierpinski carpet',
     kind: 'ifs',
     flat: true,
@@ -2322,6 +2508,10 @@ const anchor = {
 // `targets` holds [x, z] for a field preset and { word } for an IFS, discriminated in setGoal by
 // the preset kind.
 let maps = null, root = null, targets = [], targetIdx = 0, aimIdx = 0, suppR = 4, suppE = 1;
+// Indices into `targets` of the words the preset names, in the order it names them, which is
+// interior first and then out to the tip. The New target button walks this list; an object that
+// names only one word does not get the button. See the note above IFS in src/20_ifs.js.
+let aimList = [];
 let mapA = null, mapD = null, mapP = null, mapS = null, mapSc = null, mapCC = null, mapLS = null;
 let mapHue = null;
 let mDim = 2, conformal = false, terrHMax = 1;
@@ -2742,6 +2932,15 @@ function loadPreset(id, keepView) {
     for (let i = 0; i + 1 < maps.length; i++) {
       if (fixWord(maps, [i, i + 1])) targets.push({ word: [i, i + 1] });
     }
+    // The words the preset names, which are longer than either generated family: an aim that sees
+    // structure on every side is three or four letters, and the two above are one and two. Added
+    // only when the generated list does not already hold them.
+    for (const w of aimWords(P)) {
+      const word = w.split('.').map(Number);
+      if (!word.length || word.some(i => !(i >= 0 && i < maps.length))) continue;
+      if (targets.some(t => t.word && t.word.join('.') === w)) continue;
+      if (fixWord(maps, word)) targets.push({ word });
+    }
   }
   // Which target a descent starts on. The fixed point of a single map is a vertex or corner of
   // most of these attractors, and zooming into a corner frames badly: the piece hangs off one side
@@ -2749,11 +2948,13 @@ function loadPreset(id, keepView) {
   // surrounds the aim. Named per object, since the folded dragon's single map fixed point is
   // inside its sheet.
   aimIdx = 0;
-  if (P.aim !== undefined) {
+  aimList = [];
+  for (const w of aimWords(P)) {
     for (let i = 0; i < targets.length; i++) {
-      if (targets[i].word && targets[i].word.join('.') === P.aim) { aimIdx = i; break; }
+      if (targets[i].word && targets[i].word.join('.') === w) { aimList.push(i); break; }
     }
   }
+  if (aimList.length) aimIdx = aimList[0];
 
   if (!keepView) {
     // Only the escape time fields open still. Their cut costs hundreds of milliseconds and goes on
@@ -2801,6 +3002,13 @@ function loadPreset(id, keepView) {
   orthoBasis();
   dirty = true;
   syncUI();
+}
+
+// What a preset names as its descent aims. `aims` is the measured list, interior first; `aim` is
+// the older single word form. Both are strings of map indices joined by dots.
+function aimWords(P) {
+  if (Array.isArray(P.aims)) return P.aims;
+  return P.aim !== undefined ? [P.aim] : [];
 }
 
 function setGoal(i) {
@@ -6621,6 +6829,9 @@ function attachInput(cv) {
     else if (e.key === 'x' || e.key === 'X') swapRepresentation();
     else if (e.key === 'g' || e.key === 'G') toggleGauss();
     else if (e.key === 'r' || e.key === 'R') resetView();
+    // Only when there is something to restore, so Escape never HIDES anything and never fights
+    // the browser's own use of it for leaving full screen.
+    else if (e.key === 'Escape' && uiHidden) setUIHidden(false);
   });
 }
 
@@ -6702,10 +6913,37 @@ function syncUI() {
     // The per pixel object has no splats, so the switch is disabled rather than silently inert.
     gb.disabled = isDirect();
   }
+  // The tool bar. The period is written like every other value except while it is being typed
+  // into, since rewriting the textContent under a caret moves the caret to the start.
+  const ab = el('btn-auto');
+  if (ab) {
+    ab.dataset.on = autoOn ? '1' : '0';
+    ab.setAttribute('aria-checked', autoOn ? 'true' : 'false');
+  }
+  const va = el('v-auto');
+  if (va && document.activeElement !== va) va.textContent = String(autoPeriod);
+  const fb = el('btn-full');
+  if (fb) {
+    const on = !!fsElement();
+    fb.dataset.fs = on ? '1' : '0';
+    fb.setAttribute('aria-label', on ? 'leave full screen' : 'full screen');
+    fb.setAttribute('title', on ? 'Leave full screen' : 'Full screen');
+  }
+  const hb = el('btn-hide');
+  if (hb) hb.setAttribute('aria-pressed', uiHidden ? 'true' : 'false');
+  const am = el('btn-aim');
+  if (am && aimList.length > 1) {
+    const at = Math.max(0, aimList.indexOf(aimIdx));
+    const nx = (at + 1) % aimList.length;
+    am.setAttribute('title', 'Aiming at the ' + (AIM_KIND[at] || 'target ' + at) +
+      '. Next: the ' + (AIM_KIND[nx] || 'target ' + nx));
+  }
   const wrap = el('controls');
   if (wrap) {
     wrap.dataset.kind = PRESETS[cfg.preset].kind;
     wrap.dataset.julia = PRESETS[cfg.preset].julia ? '1' : '0';
+    // Only where there is more than one place worth falling into.
+    wrap.dataset.aims = aimList.length > 1 ? '1' : '0';
   }
   if (el('h-object')) el('h-object').textContent = PRESETS[cfg.preset].name;
 }
@@ -6761,6 +6999,10 @@ function bindUI() {
   sel.addEventListener('change', () => {
     const want = (isDirect() && PIXEL_PAIR[sel.value]) ? PIXEL_PAIR[sel.value] : sel.value;
     loadPreset(want, false);
+    // A hand on the menu outranks the clock: the object just chosen gets a full period, and the
+    // walk carries on from where that object sits in the order rather than from where the timer
+    // had got to. An object outside the order gives -1, which steps to its head.
+    if (autoOn) { autoAt = autoOrder.indexOf(cfg.preset); autoT = 0; }
   });
 
   for (const [id, key, xf] of SLIDERS) {
@@ -6825,6 +7067,8 @@ function bindUI() {
   if (rn) rn.addEventListener('click', () => { cfg.autopilot = !cfg.autopilot; syncUI(); });
   const rs = el('btn-reset');
   if (rs) rs.addEventListener('click', resetView);
+  const am = el('btn-aim');
+  if (am) am.addEventListener('click', nextAim);
   // The readout's second half: zoom, depth range, precision, buffer format, cut cost and hardware.
   // The state lives on the panel, so the hiding is CSS.
   const ib = el('btn-info');
@@ -6840,6 +7084,58 @@ function bindUI() {
   if (rb) rb.addEventListener('click', swapRepresentation);
   const gb = el('btn-gauss');
   if (gb) gb.addEventListener('click', toggleGauss);
+  // Auto switch. Turning it on draws the order; turning it off leaves the object that is on
+  // screen where it is, because stopping a slideshow should not also move it.
+  const ab = el('btn-auto');
+  if (ab) ab.addEventListener('click', () => {
+    autoOn = !autoOn;
+    if (autoOn) autoShuffle(); else autoT = 0;
+    syncUI();
+  });
+  // The period, typed. Same protocol as the speed field above: Enter or blur commits, Escape
+  // restores, and what is committed is clamped and written back so the field shows the period in
+  // force. Integer seconds, because nobody wants to specify a scene change to the half second,
+  // and the count restarts on commit so a new period means what it says from now.
+  const va = el('v-auto');
+  if (va) {
+    let cancelled = false;
+    const commit = () => {
+      if (!cancelled) {
+        const n = parseFloat((va.textContent || '').replace(',', '.').replace(/[^0-9.eE+-]/g, ''));
+        if (isFinite(n)) {
+          const v = Math.max(AUTO_MIN, Math.min(AUTO_MAX, Math.round(n)));
+          // Only when it actually moved. Leaving the field is a commit whether or not anything was
+          // typed, so restarting the count unconditionally would mean that tabbing through the bar
+          // pushes the next switch a full period away every time.
+          if (v !== autoPeriod) { autoPeriod = v; autoT = 0; }
+        }
+      }
+      cancelled = false;
+      syncUI();
+    };
+    va.addEventListener('focus', () => {
+      const r = document.createRange(); r.selectNodeContents(va);
+      const sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r);
+    });
+    va.addEventListener('blur', commit);
+    va.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); va.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancelled = true; va.blur(); }
+    });
+  }
+  // Full screen, and the state read back from the browser rather than remembered here: Escape
+  // and F11 leave it without going through this button, so the icon has to follow the document.
+  const fb = el('btn-full');
+  if (fb) {
+    if (!fsAvailable()) fb.hidden = true;
+    else {
+      fb.addEventListener('click', fsToggle);
+      document.addEventListener('fullscreenchange', syncUI);
+      document.addEventListener('webkitfullscreenchange', syncUI);
+    }
+  }
+  const hb = el('btn-hide');
+  if (hb) hb.addEventListener('click', () => setUIHidden(!uiHidden));
   // Anything but Auto turns the governor off. The menu is rebuilt because the bottom tier does
   // not offer the escape time objects; one already on screen stays there and only leaves the list.
   const qs = el('quality');
@@ -6881,6 +7177,34 @@ function resetView() {
   syncUI();
 }
 
+// The three kinds a preset names, in the order it names them. Position is the meaning: an object
+// lists its aims interior first and walks out to the tip.
+const AIM_KIND = ['interior', 'boundary', 'tip'];
+
+// Aim the descent somewhere else on the same object. It snaps back out to the opening view first,
+// because a re-aim at depth is not a re-aim: the new target is astronomically far away in units of
+// the current camera distance, so the aim invariant would drag the camera the whole way in one
+// frame and land it on nothing. Starting again from the top is what "zoom into a different place"
+// means. The speed and the run state are the viewer's and survive, as they do across an auto
+// switch; everything else about the view is the object's and is reset.
+function nextAim() {
+  if (aimList.length < 2) return;
+  const at = aimList.indexOf(aimIdx);
+  const want = aimList[((at < 0 ? 0 : at) + 1) % aimList.length];
+  const rate = cfg.rate, run = cfg.autopilot;
+  loadPreset(cfg.preset, false);       // which resets aimIdx to the head of the list
+  aimIdx = want;
+  setGoal(want);
+  cfg.rate = rate;
+  cfg.autopilot = run;
+  climbing = false;
+  projDist = 1e300;
+  paramKey = '';
+  stillT = 0; stillCuts = 0;
+  dirty = true;
+  syncUI();
+}
+
 // Swap the splat render for the per pixel one without moving the camera: the two are the same
 // field, palette, colour law and targets, so loadPreset keeps the view. `paramKey` is cleared so
 // the next frame rebuilds rather than drawing the other object's cut through this object's shader.
@@ -6914,6 +7238,134 @@ function toggleGauss() {
   syncUI();
 }
 
+/* ============================ the room ================================== */
+// Three controls that are about the window rather than about the object: whether the viewer
+// moves on by itself, what fills the screen, and whether there is anything on screen but the
+// render. None of them changes what is drawn, which is why they are at the opposite corner
+// from the panel that does. See #tools in page.part.html.
+
+/* ------------------------------ auto switch ------------------------------- */
+// A random order of the objects, walked and then looped, so a viewer left running shows the
+// whole set rather than the same object twice in a row. The order is drawn once when the
+// switch is turned on and kept, so what plays is a shuffled playlist and not an independent
+// coin toss each time, which is the difference between seeing everything and seeing four of
+// them repeatedly.
+//
+// THE ESCAPE TIME FIELDS ARE NOT IN IT. A plane cut is 0.4 to 9 seconds of one CPU thread
+// against 8 to 14 ms for a similarity IFS, and it goes on sharpening for twenty five seconds
+// after that, so a timed switch into the Mandelbrot or the Julia set lands on a coarse frame
+// that is still improving when the timer fires again. The Mandelbrot terrain is a field too
+// and is `hidden`, so the menu rule already excludes it.
+const AUTO_MIN = 3, AUTO_MAX = 3600;
+let autoOn = false, autoPeriod = 60, autoT = 0, autoOrder = [], autoAt = -1;
+
+// Named POSITIVELY, `kind === 'ifs'`, and not as everything that is not a plane: the second
+// form admits the Mandelbrot terrain, which is out today only because it is `hidden`, and whose
+// load alone is a 28x28 grid of field probes plus a boundary projection for each of six targets,
+// synchronously, inside the frame callback. `hidden` and `direct` are kept as well so this pool
+// can never contain something the object menu does not.
+function autoPool() {
+  return Object.keys(PRESETS).filter(k => {
+    const P = PRESETS[k];
+    return !P.hidden && !P.direct && P.kind === 'ifs';
+  });
+}
+
+// Fisher-Yates, and the walk starts at whatever is on screen: `indexOf` returns -1 for an
+// object outside the order, which is the Mandelbrot or the Julia set, and -1 steps to 0, so
+// the first switch is to the head of the order rather than past it.
+function autoShuffle() {
+  const pool = autoPool();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  autoOrder = pool;
+  autoAt = pool.indexOf(cfg.preset);
+  autoT = 0;
+}
+
+// The speed and the run state are the VIEWER's and not the object's, so both are carried
+// across by hand: loadPreset writes the new object's own view block over cfg and sets the
+// autopilot from its kind, which would silently return a projector to speed 1 and restart a
+// descent the viewer had paused. Everything else about the object is meant to change; that is
+// what the switch is for.
+function autoNext() {
+  if (!autoOrder.length) return;
+  autoAt = (autoAt + 1) % autoOrder.length;
+  const rate = cfg.rate, run = cfg.autopilot;
+  loadPreset(autoOrder[autoAt], false);
+  cfg.rate = rate;
+  cfg.autopilot = run;
+  // The flight state is the previous object's and loadPreset does not own it. Switching away
+  // from an escape time field that had turned around at its precision wall leaves `climbing`
+  // set, and the new object then opens at cam.startDist with the climb branch live: it passes
+  // the turnaround test on its first frame and calls setGoal(targetIdx + 1), throwing away the
+  // aim word the preset names on purpose.
+  climbing = false;
+  projDist = 1e300;
+  dirty = true;
+  syncUI();
+}
+
+// On the frame clock and not on an interval. requestAnimationFrame does not fire in a
+// background tab, so a timer would come back to a viewer that had switched thirty times with
+// nothing drawn and a cut queued for each; counting frames' worth of dt makes the period mean
+// seconds of RENDERED time, which is the only kind this viewer has.
+function autoTick(dt) {
+  if (!autoOn || !(autoPeriod > 0)) return;
+  autoT += dt;
+  if (autoT < autoPeriod) return;
+  autoT = 0;
+  autoNext();
+}
+
+/* ------------------------------ full screen ------------------------------- */
+// The browser's own, which is not the same thing as the project page's "Open in full screen":
+// that one promotes the iframe to a fixed overlay INSIDE the page, so the page's own chrome is
+// still around it. This one takes the display, which is the one that matters on a projector.
+// Inside an iframe it needs allowfullscreen, which the project page's iframe carries; where the
+// API is missing or the frame was embedded without it, the button is not offered at all rather
+// than offered and inert.
+function fsElement() {
+  if (typeof document === 'undefined') return null;
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+function fsAvailable() {
+  if (typeof document === 'undefined') return false;
+  const d = document.documentElement;
+  if (!d || !(d.requestFullscreen || d.webkitRequestFullscreen)) return false;
+  const en = document.fullscreenEnabled !== undefined
+    ? document.fullscreenEnabled : document.webkitFullscreenEnabled;
+  return en !== false;
+}
+function fsToggle() {
+  const d = document.documentElement;
+  if (!d) return;
+  // Both calls reject rather than throw when the gesture is not trusted or the frame is not
+  // permitted, and an unhandled rejection in a demo is a console error nobody can act on.
+  if (fsElement()) {
+    const x = document.exitFullscreen || document.webkitExitFullscreen;
+    if (x) { const r = x.call(document); if (r && r.catch) r.catch(() => {}); }
+  } else {
+    const q = d.requestFullscreen || d.webkitRequestFullscreen;
+    if (q) { const r = q.call(d); if (r && r.catch) r.catch(() => {}); }
+  }
+}
+
+/* --------------------------- the hidden interface ------------------------- */
+// The state is one attribute on the root element and the hiding itself is CSS, the same way
+// the readout's second half is hidden behind data-info. Escape restores; so does the control
+// itself, which is the only thing left on screen.
+let uiHidden = false;
+function setUIHidden(v) {
+  uiHidden = !!v;
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.setAttribute('data-ui', uiHidden ? '0' : '1');
+  }
+  syncUI();
+}
+
 // A view is named by the original frame plus the anchor word, so replay is exact: walk the same
 // sequence of maps, then write the camera, which the query already gives in the anchor's frame.
 function applyURL() {
@@ -6921,6 +7373,13 @@ function applyURL() {
   // The tier is read before the preset: it decides which objects are in the menu and how large
   // the first cut may be. `q=auto` is the default.
   if (q.has('q')) perfSet(q.get('q'));
+  // Auto switch, before the object is loaded and before the early return below, so a link can
+  // ask for it with or without naming an object. The order is drawn in boot(), once whatever
+  // object this query asks for is the one on screen.
+  if (q.has('ap') && isFinite(+q.get('ap'))) {
+    autoPeriod = Math.max(AUTO_MIN, Math.min(AUTO_MAX, Math.round(+q.get('ap'))));
+  }
+  if (q.has('as')) autoOn = q.get('as') === '1';
   if (!q.has('p') || !PRESETS[q.get('p')]) return false;
   const num = (k, d) => (q.has(k) && isFinite(+q.get(k))) ? +q.get(k) : d;
   loadPreset(q.get('p'), false);
@@ -7171,6 +7630,9 @@ function frame(t) {
   const dt = fixedDt > 0 ? fixedDt : (last ? Math.min(0.1, (t - last) / 1000) : 0.016);
   last = t;
   frameCount++;
+  // Before anything reads the object: a switch here is exactly what a change in the object menu
+  // does between two frames, and the signature test below then takes the new object's branch.
+  autoTick(dt);
 
   // The resource tier decides the pixel ratio, the pixel ceiling and the refinement slice, and
   // the governor moves the tier from the measured frame time. See src/35_perf.js.
@@ -7436,6 +7898,10 @@ function boot() {
   cfg.gauss = gaussRecall();
   bindUI();
   if (!applyURL()) loadPreset(cfg.preset, false);
+  // After the object is loaded, so the walk starts from what is on screen rather than from the
+  // default preset that was there while the query was being read.
+  if (autoOn) autoShuffle();
+  setUIHidden(false);
   syncUI();
   attachInput(cv);
   requestAnimationFrame(frame);

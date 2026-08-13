@@ -18,11 +18,32 @@ function spec(o) {
   return { A: B, b: new Float64Array(o.t), p: o.p === undefined ? 1 : o.p, cc: o.cc };
 }
 
+// WHERE A DESCENT AIMS, and it is measured rather than chosen by eye. The aim is the fixed point
+// of a word, so the attractor around it is exactly self similar under that word's map and the
+// picture at radius r is the picture at radius r*s: one measurement is the whole descent. The
+// number that decides whether the zoom looks right is the largest ANGULAR GAP around the aim in
+// the view plane, from a four million point chaos game binned at two degrees over three radii. A
+// gap near 360 means the structure hangs off one side and the rest of the frame stays black.
+//
+// The metric was checked against a human before it was used: every object called badly framed
+// measured 178 degrees or more, the one called good measured 36, and the ones nobody mentioned
+// measured 0 to 102.
+//
+// It fights the colour. A word that sees structure on every side is one that visits every map
+// about equally, and the per map hue increments have zero measure weighted mean, so exactly those
+// words drift nowhere and the object holds one colour for the whole zoom. Every aim below is the
+// best gap among words that still carry at least 0.07 turns of hue per decade, which is why they
+// are three and four letters rather than the shortest word that frames well.
+//
+// `aims` is [interior, boundary, tip], in that order: the first is the default, and the New target
+// button in the panel cycles them. `aim` is the older single word form and still works.
 const IFS = {
   sierpinski: {
-    // A single map's fixed point satisfies x = 0.5x + 0.5q, so the aim is the vertex q, and the
-    // structure hangs off one side of the frame rather than surrounding the camera.
-    aim: '0',
+    // Was the vertex q, the fixed point of a single map, which left 294 degrees of the frame
+    // empty. The three letter word visits three of the four pieces, so its fixed point is down in
+    // the middle of the tetrahedron: 0 degrees empty, and the hue still travels 0.089 turns a
+    // decade. See the note on aims above.
+    aims: ['2.3.1', '0.3.0', '0'],
     name: 'Sierpinski tetrahedron',
     kind: 'ifs',
     blurb: 'Four maps, contraction one half, no rotation. Ground truth: the attractor and its invariant ' +
@@ -49,7 +70,12 @@ const IFS = {
   },
 
   gasket: {
-    aim: '0.1',
+    // The two letter word sits on an OUTER edge, so the exterior half plane is black: 180
+    // degrees. A four letter word that visits all three pieces with one repeated lands inside the
+    // gasket, 0 degrees empty, and the repeat is what keeps the hue moving: a word that visits
+    // every map equally has exactly zero net hue, since the increments have zero measure weighted
+    // mean. 0.071 turns a decade against the old 0.141.
+    aims: ['0.0.1.2', '0.1', '0'],
     name: 'Sierpinski triangle',
     kind: 'ifs',
     flat: true,
@@ -76,6 +102,13 @@ const IFS = {
   },
 
   dragon: {
+    // Had no second or third target at all. '0.0.1' measures 12 degrees empty against 106 for the
+    // lone map, at 0.133 turns a decade; '1', the other map alone, is the mirror corner of the
+    // sheet the first map's fixed point already opens on, 38 degrees and the loop's best hue
+    // travel at 0.399. The two letter word '0.1' frames tighter still, 4 degrees, but visits both
+    // maps once each and their increments are exactly opposite, so it holds one colour for the
+    // whole descent; see the note on the terdragon's old middle piece below.
+    aims: ['0', '0.0.1', '1'],
     name: 'Folded dragon',
     kind: 'ifs',
     // The Heighway curve tiles the plane, so its similarity dimension is exactly 2, and tilting
@@ -103,7 +136,10 @@ const IFS = {
   },
 
   cantor: {
-    aim: '0.1',
+    // 178 degrees empty at the old two letter word. Descending twice into one corner and once
+    // into another lands between the cubes rather than on the outside of them: 0 degrees, and the
+    // hue travel is unchanged at 0.153 turns a decade against 0.162.
+    aims: ['2.0.0', '0.1', '1'],
     name: 'Cantor cube',
     kind: 'ifs',
     blurb: 'The middle thirds Cantor set cubed: eight corner copies at ratio one third. Dimension ' +
@@ -130,7 +166,11 @@ const IFS = {
   },
 
   koch: {
-    aim: '0.1',
+    // '0.1' is the joint the curve opens on, 198 degrees empty: a thread rather than a cloud, so
+    // nothing here reaches the near zero degrees the fatter objects do. '2', one of the two tilted
+    // middle maps, is the best of them at 130, just clearing the hue floor at 0.070. '0', the outer
+    // untilted map, sits at the initiator's own endpoint and measures 330: the curve's actual tip.
+    aims: ['0.1', '2', '0'],
     name: 'Koch curve',
     kind: 'ifs',
     // Planar, so it sits in the 2D group of the picker and the autopilot must not turn it: a
@@ -171,7 +211,11 @@ const IFS = {
   },
 
   vicsek: {
-    aim: '0.1',
+    // The centre map alone frames tightest of all, 38 degrees, but its cc sits exactly on the
+    // measure weighted mean by symmetry so it carries zero hue: same trap as the dragon's '0.1'.
+    // '0.5', one step off centre into an arm, is the best word that still clears the hue floor, 28
+    // degrees at 0.092. '6', the opposite arm's own tip, measures 172 at 0.184.
+    aims: ['0.1', '0.5', '6'],
     name: 'Vicsek cross',
     kind: 'ifs',
     blurb: 'The centre cell of a three by three by three block plus its six face neighbours, ratio one ' +
@@ -209,9 +253,17 @@ const IFS = {
   // fixed number of primitives at a fixed screen size, so nothing here has dimension over 2.
 
   terdragon: {
-    // The middle piece: its fixed point is interior to the sheet rather than at an end of the
-    // curve, so the structure surrounds the aim from the first frame.
-    aim: '1',
+    // THE MIDDLE PIECE WAS BOTH PROBLEMS AT ONCE. Its hue increment is exactly zero, because
+    // three equal maps whose colour coordinates are symmetric put the middle one on the weighted
+    // mean, and the descent adds that increment once per rebase: measured, 0.000 turns a decade
+    // where every other object here runs 0.11 to 0.40, which is why the terdragon held one blue
+    // for the whole zoom. It was not interior either, whatever the old note said: 204 degrees of
+    // the frame empty. One level into an outer piece and one into the middle fixes both, 0 degrees
+    // empty and 0.147 turns a decade, without touching the palette. `0.0.1` travels further
+    // through the ramp, 0.196, but it also lifts the descent's median brightness 5.5 times, and
+    // then the OPENING frame reads as dark against it at a fifth of the median even though it is
+    // brighter in absolute terms than anything the old aim ever drew. See section 10.
+    aims: ['1.0', '2.1.2', '2'],
     name: 'Folded terdragon',
     kind: 'ifs',
     // Three similarities of ratio 1/sqrt(3), hexagonal where the Heighway dragon is square. The
@@ -274,7 +326,9 @@ const IFS = {
   levy: {
     // A one letter word, so the aim sits at an end of the curve: the two letter word's multiplier
     // is (e^(i45)/sqrt2)(e^(-i45)/sqrt2) = 1/2 exactly, and this object is here for the spiral.
-    aim: '0',
+    // '0.1.1' is the best framed word short of that cancellation, 32 degrees at 0.133 turns a
+    // decade. '1', the far end of the curve from '0', mirrors it at 154 degrees.
+    aims: ['0', '0.1.1', '1'],
     name: 'Levy C curve',
     kind: 'ifs',
     flat: true,
@@ -304,7 +358,11 @@ const IFS = {
   },
 
   pythagoras: {
-    aim: '0',
+    // '0' is the long branch's own fixed point, kept for the spiral: see the lean note below. Two
+    // unequal maps frame worse than the other objects here at any short word; the best that still
+    // clears the hue floor is '0.1.1', 52 degrees at 0.160. '1', the short branch's own tip,
+    // mirrors '0' at 180.
+    aims: ['0', '0.1.1', '1'],
     name: 'Pythagoras tree',
     kind: 'ifs',
     flat: true,
@@ -356,7 +414,10 @@ const IFS = {
   },
 
   pentaflake: {
-    aim: '0.1',
+    // 180 degrees empty on the outer edge of the flake. Twice into one arm and once into the
+    // one across lands among the pentagons instead of outside them: 6 degrees, 0.136 turns a
+    // decade against 0.153.
+    aims: ['0.2.0', '0.1', '2'],
     name: 'Pentaflake',
     kind: 'ifs',
     flat: true,
@@ -389,7 +450,10 @@ const IFS = {
   },
 
   carpet: {
-    aim: '0.1',
+    // 180 degrees empty, the old aim being on the carpet's own outer edge. Twice into a corner
+    // square and once into the far side puts the aim inside: 0 degrees, 0.117 turns a decade
+    // against 0.162.
+    aims: ['0.0.4', '1', '2'],
     name: 'Sierpinski carpet',
     kind: 'ifs',
     flat: true,

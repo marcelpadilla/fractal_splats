@@ -13,7 +13,7 @@
 // checks in section 10 see a coarser cut than the thresholds were set for. On a
 // busy machine they report dark frames and fail; alone they pass. Everything
 // before section 9 is deterministic and load independent.
-import { api, get } from './harness.mjs';
+import { api, get, set } from './harness.mjs';
 
 const {
   loadPreset, buildCut, advanceCamera, pickTarget, rebaseAll, rebaseInto, logZoom,
@@ -262,6 +262,14 @@ ok('float64 wall past 1e12 without rebasing', w64 > 12, '1e' + w64.toFixed(2));
   const zFar = 1 + 8 / cfg.fog;
   cam.dist = get('suppE') / (zFar * 4) * 0.98;         // just past the trigger
   cam.target.set(cam.goal);
+  // A DISCARDED CUT FIRST, because the first cut at a given budget is not the steady one: the
+  // node pool grows during the walk that needs it, and a walk that grew its own pool comes back
+  // with a slightly different set. Measured on the tetrahedron at 60 000 splats, the first build
+  // of a session gives 25.2118 of light and every build after it gives 29.0819, a 15 percent
+  // difference for one splat of count. It went unnoticed while this test aimed at a vertex, where
+  // the whole frame carries 0.087 of light and 15 percent of it is nothing; the aim is now inside
+  // the tetrahedron and the same frame carries three hundred times more.
+  buildCut(W, H);
   const before = buildCut(W, H);
   // What the shader receives is w * norm, so that is what a rebase has to preserve.
   // The raw weights cannot be compared either side: after a rebase they are
@@ -571,6 +579,86 @@ head('9b. the per pixel path: its image to plane map is exactly the inverse of p
       'deepest 10^' + deepest.toFixed(1) + ', climbed ' + climbed.toFixed(2));
   }
 }
+
+/* --------------- 11. the auto switch: the walk, and what survives it ------- */
+// The tool bar's other two controls are the browser's business and the stylesheet's, and neither
+// can be reached from here. This one is state: which objects it may choose, in what order, and
+// what it is not allowed to disturb on the way. Driven through the real script scope, so what is
+// checked is the code the page runs rather than a copy of it.
+head('11. auto switch');
+const apool = get('autoPool')();
+ok('the pool is the eleven iterated function systems', apool.length === 11, apool.join(' '));
+ok('and holds nothing else', apool.every(k =>
+  PRESETS[k].kind === 'ifs' && !PRESETS[k].hidden && !PRESETS[k].direct));
+// By name as well as by rule: an escape time cut is 0.4 to 9 s against 8 to 14 ms for a similarity
+// IFS, so a timed switch into one lands on a frame still sharpening when the timer fires again.
+ok('the escape time objects are excluded',
+  ['mandel2d', 'julia2d', 'mandelgpu', 'juliagpu', 'mandelbrot'].every(k => !apool.includes(k)));
+
+loadPreset('dragon', false);
+const orders = new Set();
+let perms = true;
+for (let i = 0; i < 20; i++) {
+  get('autoShuffle')();
+  const o = get('autoOrder');
+  if (o.length !== 11 || new Set(o).size !== 11) perms = false;
+  orders.add(o.join('.'));
+}
+ok('every shuffle is a permutation of the whole pool', perms);
+ok('and not the same one twice', orders.size > 15, orders.size + ' distinct in 20');
+
+// One order, walked and then looped: eleven switches show eleven objects, and the twelfth is the
+// first of the SAME order rather than the first of a new one.
+loadPreset('dragon', false);
+get('autoShuffle')();
+const order0 = get('autoOrder').slice();
+ok('the walk starts where the viewer already is', get('autoAt') === order0.indexOf('dragon'));
+const walk = [];
+for (let i = 0; i < 11; i++) { get('autoNext')(); walk.push(cfg.preset); }
+ok('eleven switches show eleven different objects', new Set(walk).size === 11, walk.join(' '));
+get('autoNext')();
+ok('and the twelfth loops the same order',
+  cfg.preset === walk[0] && get('autoOrder').join('.') === order0.join('.'));
+
+// An object outside the order, which is what the Mandelbrot and the Julia set are: indexOf gives
+// -1, and -1 steps to 0, so the first switch is to the head rather than one past it.
+loadPreset('mandel2d', false);
+get('autoShuffle')();
+ok('an object outside the order gives -1', get('autoAt') === -1);
+get('autoNext')();
+ok('and the first switch goes to the head of the order', cfg.preset === get('autoOrder')[0]);
+
+// The speed and the run state belong to the viewer, so loadPreset must not be left to write them:
+// it copies the new object's view block over cfg and sets autopilot from the object's kind.
+loadPreset('dragon', false);
+cfg.rate = 3.75; cfg.autopilot = false;
+get('autoShuffle')(); get('autoNext')();
+ok('the speed survives a switch', cfg.rate === 3.75, 'rate ' + cfg.rate);
+ok('a paused viewer stays paused', cfg.autopilot === false);
+ok('the object own settings do change', cfg.budget === PRESETS[cfg.preset].view.budget,
+  'budget ' + cfg.budget);
+// The flight state is the PREVIOUS object's. Left set, the new object opens at cam.startDist with
+// the climb branch live, passes the turnaround test on its first frame and re-aims, throwing away
+// the aim word its preset names on purpose.
+set('climbing', true);
+get('autoNext')();
+ok('the climb does not carry into the next object', get('climbing') === false);
+ok('and neither does the projection distance', get('projDist') === 1e300);
+
+// The countdown is in seconds of RENDERED time, since it is fed the frame's own dt. One frame of
+// slack and not none: a hundred additions of 0.05 come to 4.999999999999998.
+loadPreset('dragon', false);
+set('autoOn', true); set('autoPeriod', 5); set('autoT', 0);
+get('autoShuffle')();
+const held = cfg.preset;
+for (let i = 0; i < 99; i++) get('autoTick')(0.05);
+ok('nothing switches before the period is up', cfg.preset === held, get('autoT').toFixed(2) + ' s');
+get('autoTick')(0.05); get('autoTick')(0.05);
+ok('and it switches within one frame of it', cfg.preset !== held, cfg.preset);
+set('autoOn', false);
+const parked2 = cfg.preset;
+for (let i = 0; i < 400; i++) get('autoTick')(0.05);
+ok('a switch that is off never fires', cfg.preset === parked2);
 
 console.log('\n' + (fails ? fails + ' CHECK(S) FAILED' : 'all checks passed'));
 process.exitCode = fails ? 1 : 0;
