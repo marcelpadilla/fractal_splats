@@ -84,6 +84,13 @@ select {
   color-scheme: dark;
 }
 select:hover { border-color: var(--live); }
+/* `color-scheme: dark` alone still left the open list mid-grey in Chromium, not the panel's own
+   near black, because the OS dark palette and this panel's are not the same dark. Naming the
+   option colours directly is honoured by every current engine for a plain (non-multiple) select
+   and closes that gap: white text on near black, matching the control instead of the platform. */
+select option {
+  background-color: #0d0a0a; color: var(--ink);
+}
 button {
   padding: 6px 10px; border-radius: 3px; cursor: pointer; letter-spacing: .06em;
   text-transform: uppercase; font-size: 11px;
@@ -351,24 +358,89 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
 /* Nothing to offer when the API is missing or the frame was embedded without allowfullscreen. */
 #btn-full[hidden] { display: none; }
 
+/* ---- the auto switch settings window -----------------------------------------
+   A small dialog that opens above the tool bar when the gear is pressed and closes
+   on its cross, a press of the gear again, Escape, or a click outside it. It is the
+   one piece of chrome that is not the room's object controls and it is not the tool
+   bar either, so it is its own panel: same ink on near black as everything else, a
+   rounded sheet with a strong edge so it reads as floating over the render rather
+   than glue. It is anchored to the tool bar's corner and never wider than the panel,
+   so on a phone it still fits against the same corner it opens from.
+   --------------------------------------------------------------------------- */
+#auto-settings {
+  position: fixed; right: 8px; bottom: 56px; z-index: 3;
+  width: 252px; max-width: calc(100vw - 16px);
+  padding: 12px 14px 14px;
+  background: linear-gradient(160deg, #16100f, #100b0b 74%, #0d0a0a);
+  border: 1px solid var(--rule); border-radius: 10px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  font: 400 12px/1.45 var(--mono); color: var(--ink);
+}
+#auto-settings[hidden] { display: none; }
+#auto-settings .as-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 10px; padding-bottom: 9px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink);
+}
+#auto-settings .as-head button {
+  padding: 0; width: 22px; height: 22px; display: grid; place-items: center;
+  border-radius: 50%; font-size: 12px; line-height: 1;
+  background: rgba(0, 0, 0, 0.45); border: 1px solid var(--rule); color: var(--ink);
+}
+#auto-settings .as-head button:hover { border-color: var(--live); color: var(--live); }
+#auto-settings .as-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 9px;
+}
+#auto-settings .as-row select {
+  width: 110px; padding: 5px 7px; margin: 0;
+  font: inherit; color: var(--ink);
+  background: rgba(0, 0, 0, 0.55); border: 1px solid var(--rule); border-radius: 3px;
+}
+#auto-settings .as-row select:hover { border-color: var(--live); }
+#auto-settings .as-check {
+  display: flex; align-items: center; gap: 8px; text-transform: none;
+  letter-spacing: .02em; font-size: 12px; cursor: pointer;
+}
+#auto-settings .as-check input { margin: 0; accent-color: var(--fill); cursor: pointer; }
+#auto-settings .as-sep {
+  height: 1px; margin: 10px 0; background: var(--rule);
+}
+#auto-settings .as-label {
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 7px;
+}
+#auto-settings #auto-fractal-list {
+  max-height: 200px; overflow-y: auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px;
+}
+/* The scrollbar would otherwise be whatever the OS leaves; keep it dim and small. */
+#auto-fractal-list::-webkit-scrollbar { width: 6px; }
+#auto-fractal-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+#auto-fractal-list label {
+  display: flex; align-items: center; gap: 7px; padding: 3px 2px;
+  font-size: 11.5px; color: var(--ink); cursor: pointer; white-space: nowrap;
+}
+#auto-fractal-list label:hover { color: var(--live); }
+#auto-fractal-list input { margin: 0; accent-color: var(--fill); cursor: pointer; }
+
 /* ---- the hidden interface ----------------------------------------------------
-   Everything goes except the control that undoes it, which stays exactly where it
-   was at low opacity. A control that vanished with the rest would leave a viewer
-   with a full screen render and no way back but the keyboard, and someone who has
-   just hidden the interface is the last person who should have to guess a key.
-   Hovering or focusing it brings it back to full strength, so it is a ghost to the
-   room and an ordinary button to the hand. Escape restores as well; see the keydown
-   handler in src/70_ui.js.
+   Everything goes, the hide control itself included: a viewer who asked for
+   nothing but the render should get nothing, not one button left glowing over
+   it. There is no target left to press, so getting the room back does not need
+   one either — any click that is not a drag, any key, or Escape all restore it;
+   see the pointerup and keydown handlers in src/70_ui.js.
    --------------------------------------------------------------------------- */
 :root[data-ui="0"] #controls,
 :root[data-ui="0"] #sound,
 :root[data-ui="0"] #btn-info,
 :root[data-ui="0"] #btn-auto,
-:root[data-ui="0"] #tools .num,
+:root[data-ui="0"] #btn-auto-settings,
+:root[data-ui="0"] #auto-settings,
 :root[data-ui="0"] #btn-full,
+:root[data-ui="0"] #btn-hide,
 :root[data-ui="0"] #loupe-note { display: none; }
-:root[data-ui="0"] #btn-hide { opacity: .45; }
-:root[data-ui="0"] #btn-hide:hover, :root[data-ui="0"] #btn-hide:focus-visible { opacity: 1; }
 
 /* ---- the magnified squares' captions ----------------------------------------
    Text, over a canvas that has no text in it. There is no font in this renderer
@@ -516,13 +588,18 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
      are not in that order, since a plane cut is hundreds of milliseconds to seconds against 8 to
      14 ms for an iterated function system and a timed switch would land on a frame still
      sharpening. Full screen is the browser's, not the project page's overlay. Hide UI leaves
-     nothing but the render and itself. -->
+     nothing on screen at all; see the hidden-interface rule above. -->
 <div id="tools">
   <button id="btn-auto" type="button" role="switch" aria-checked="false"
           title="Walk the objects in a random order, one every so many seconds">Auto switch</button>
-  <span class="num"><output id="v-auto" contenteditable="true" inputmode="numeric"
-        spellcheck="false" role="textbox" tabindex="0"
-        title="Seconds on each object; click to type">60</output><i>s</i></span>
+  <button id="btn-auto-settings" type="button" aria-haspopup="dialog" aria-expanded="false"
+          aria-controls="auto-settings" title="Auto switch settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
   <button id="btn-full" type="button" aria-label="full screen" title="Full screen">
     <svg class="fs-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -534,7 +611,40 @@ button.sw:hover:not(:disabled) { border-color: var(--live); color: var(--ink); }
     </svg>
   </button>
   <button id="btn-hide" type="button" aria-pressed="false"
-          title="Hide everything but the render. Escape brings it back">Hide UI</button>
+          title="Hide everything but the render. Any click, key or Escape brings it back">Hide UI</button>
+</div>
+
+<!-- The auto switch settings window: a small dialog anchored above the tool bar, opened and
+     closed by the gear button, its own cross, Escape, or a click outside it. Built once in
+     bindUI from the same preset list the object menu uses, so it never drifts out of sync with
+     what the viewer can actually show. -->
+<div id="auto-settings" role="dialog" aria-label="Auto switch settings" hidden>
+  <div class="as-head">
+    <span>Auto switch settings</span>
+    <button id="auto-settings-close" type="button" aria-label="Close">&#10005;</button>
+  </div>
+  <label class="as-row">
+    <span>Seconds per object</span>
+    <select id="auto-seconds" aria-label="seconds per object">
+      <option value="5">5s</option>
+      <option value="10">10s</option>
+      <option value="15">15s</option>
+      <option value="30">30s</option>
+      <option value="45">45s</option>
+      <option value="60" selected>60s</option>
+      <option value="90">90s</option>
+      <option value="120">2 min</option>
+      <option value="300">5 min</option>
+      <option value="600">10 min</option>
+    </select>
+  </label>
+  <label class="as-check">
+    <input type="checkbox" id="auto-randomize">
+    <span>Randomize target</span>
+  </label>
+  <div class="as-sep"></div>
+  <div class="as-label">Include in the loop</div>
+  <div id="auto-fractal-list"></div>
 </div>
 
 <!-- Captions for the two magnified squares. Positioned by loupeNote in src/70_ui.js's frame loop
@@ -903,11 +1013,12 @@ const IFS = {
   },
 
   koch: {
-    // '0.1' is the joint the curve opens on, 198 degrees empty: a thread rather than a cloud, so
-    // nothing here reaches the near zero degrees the fatter objects do. '2', one of the two tilted
-    // middle maps, is the best of them at 130, just clearing the hue floor at 0.070. '0', the outer
-    // untilted map, sits at the initiator's own endpoint and measures 330: the curve's actual tip.
-    aims: ['0.1', '2', '0'],
+    // '2', one of the two tilted middle maps, is the best framed of the aims at 130 degrees,
+    // just clearing the hue floor at 0.070, and opens by default. '0.1' is the joint the curve
+    // opens on, 198 degrees empty: a thread rather than a cloud, so nothing here reaches the near
+    // zero degrees the fatter objects do. '0', the outer untilted map, sits at the initiator's own
+    // endpoint and measures 330: the curve's actual tip.
+    aims: ['2', '0.1', '0'],
     name: 'Koch curve',
     kind: 'ifs',
     // Planar, so it sits in the 2D group of the picker and the autopilot must not turn it: a
@@ -1063,9 +1174,10 @@ const IFS = {
   levy: {
     // A one letter word, so the aim sits at an end of the curve: the two letter word's multiplier
     // is (e^(i45)/sqrt2)(e^(-i45)/sqrt2) = 1/2 exactly, and this object is here for the spiral.
-    // '0.1.1' is the best framed word short of that cancellation, 32 degrees at 0.133 turns a
-    // decade. '1', the far end of the curve from '0', mirrors it at 154 degrees.
-    aims: ['0', '0.1.1', '1'],
+    // '1', the far end of the curve from '0', mirrors it at 154 degrees. A third aim, '0.1.1', used
+    // to sit between them at 32 degrees, but this object is dense rather than a thread and that
+    // word framed a patch with no visible structure, so it was dropped: two aims only.
+    aims: ['0', '1'],
     name: 'Levy C curve',
     kind: 'ifs',
     flat: true,
@@ -6809,7 +6921,11 @@ function attachInput(cv) {
     pinch = pinchSpan();
     const wasDrag = moved > 6;
     drag = null;
-    // No tap to re-aim. Wheel and pinch move along the existing aim, which cannot leave the object.
+    // No tap to re-aim: a plain click on the render does nothing to the camera. When the
+    // interface is hidden it does do one thing, which is bring the interface back — but only a
+    // click, not the drag or pinch that moves the view, or restoring would fight every gesture
+    // the hidden render still answers to.
+    if (uiHidden && !wasDrag && !wasPinch) setUIHidden(false);
   });
   cv.addEventListener('pointercancel', e => {
     touches.delete(e.pointerId); pinch = pinchSpan(); drag = null;
@@ -6822,6 +6938,11 @@ function attachInput(cv) {
     dirty = true;
   }, { passive: false });
   window.addEventListener('keydown', e => {
+    // Every key un-hides while hidden, and does nothing else on that press: someone who just
+    // hid the interface should get it back with the very next thing they touch, not have to
+    // land on the one right shortcut. This also covers Escape, so it no longer needs its own
+    // branch below.
+    if (uiHidden) { setUIHidden(false); e.preventDefault(); return; }
     const tag = e.target && e.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.target && e.target.isContentEditable) return;   // the typed speed, see #v-rate
@@ -6829,9 +6950,6 @@ function attachInput(cv) {
     else if (e.key === 'x' || e.key === 'X') swapRepresentation();
     else if (e.key === 'g' || e.key === 'G') toggleGauss();
     else if (e.key === 'r' || e.key === 'R') resetView();
-    // Only when there is something to restore, so Escape never HIDES anything and never fights
-    // the browser's own use of it for leaving full screen.
-    else if (e.key === 'Escape' && uiHidden) setUIHidden(false);
   });
 }
 
@@ -6920,8 +7038,15 @@ function syncUI() {
     ab.dataset.on = autoOn ? '1' : '0';
     ab.setAttribute('aria-checked', autoOn ? 'true' : 'false');
   }
-  const va = el('v-auto');
-  if (va && document.activeElement !== va) va.textContent = String(autoPeriod);
+  // The settings window reflects the state: the seconds dropdown shows the period in force, and
+  // the whole window mirrors whether it is open on the gear button. Only while the window is not
+  // focused, so an open dropdown is not snapped shut by its own state write.
+  const av = el('auto-seconds');
+  if (av && document.activeElement !== av) av.value = String(autoPeriod);
+  const asel = el('auto-randomize');
+  if (asel && document.activeElement !== asel) asel.checked = autoRandomize;
+  const ag = el('btn-auto-settings');
+  if (ag) ag.setAttribute('aria-expanded', autoSettingsOpen ? 'true' : 'false');
   const fb = el('btn-full');
   if (fb) {
     const on = !!fsElement();
@@ -7092,36 +7217,48 @@ function bindUI() {
     if (autoOn) autoShuffle(); else autoT = 0;
     syncUI();
   });
-  // The period, typed. Same protocol as the speed field above: Enter or blur commits, Escape
-  // restores, and what is committed is clamped and written back so the field shows the period in
-  // force. Integer seconds, because nobody wants to specify a scene change to the half second,
-  // and the count restarts on commit so a new period means what it says from now.
-  const va = el('v-auto');
-  if (va) {
-    let cancelled = false;
-    const commit = () => {
-      if (!cancelled) {
-        const n = parseFloat((va.textContent || '').replace(',', '.').replace(/[^0-9.eE+-]/g, ''));
-        if (isFinite(n)) {
-          const v = Math.max(AUTO_MIN, Math.min(AUTO_MAX, Math.round(n)));
-          // Only when it actually moved. Leaving the field is a commit whether or not anything was
-          // typed, so restarting the count unconditionally would mean that tabbing through the bar
-          // pushes the next switch a full period away every time.
-          if (v !== autoPeriod) { autoPeriod = v; autoT = 0; }
-        }
-      }
-      cancelled = false;
+  // The period, from the settings window's dropdown now. A change restarts the count from now,
+  // so a new period means what it says from the moment it is chosen, and it is remembered.
+  const av = el('auto-seconds');
+  if (av) {
+    av.value = String(autoPeriod);
+    av.addEventListener('change', () => {
+      const v = Math.max(AUTO_MIN, Math.min(AUTO_MAX, Math.round(+av.value || 0)));
+      av.value = String(v);
+      if (v !== autoPeriod) { autoPeriod = v; autoT = 0; }
+      autoRemember(AUTO_SEC_KEY, String(v));
       syncUI();
-    };
-    va.addEventListener('focus', () => {
-      const r = document.createRange(); r.selectNodeContents(va);
-      const sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r);
     });
-    va.addEventListener('blur', commit);
-    va.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); va.blur(); }
-      else if (e.key === 'Escape') { e.preventDefault(); cancelled = true; va.blur(); }
+  }
+  // Randomize target, off by default, remembered, and affecting the next timed switch from now.
+  const ar = el('auto-randomize');
+  if (ar) {
+    ar.checked = autoRandomize;
+    ar.addEventListener('change', () => {
+      autoRandomize = ar.checked;
+      autoRemember(AUTO_RND_KEY, autoRandomize ? '1' : '0');
+      syncUI();
     });
+  }
+  // The include list, built once from the same pool the loop walks so it never drifts out of
+  // sync with what the viewer can actually show.
+  buildAutoFractalList();
+  // The gear opens and closes the window, as does its cross, Escape, or a click outside it.
+  const ag = el('btn-auto-settings');
+  if (ag) ag.addEventListener('click', e => { e.stopPropagation(); autoSettingsSet(!autoSettingsOpen); });
+  const ac = el('auto-settings-close');
+  if (ac) ac.addEventListener('click', e => { e.stopPropagation(); autoSettingsSet(false); });
+  const dlg = el('auto-settings');
+  if (dlg) dlg.addEventListener('click', e => e.stopPropagation());
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', () => { if (autoSettingsOpen) autoSettingsSet(false); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && autoSettingsOpen) { autoSettingsSet(false); e.stopPropagation(); }
+    });
+    // The room's hide leaves nothing on screen, the window included; when it comes back the
+    // window stays away rather than resurrecting over a view the viewer has just reduced to the
+    // render.
+    document.addEventListener('ui-hidden', () => { if (autoSettingsOpen) autoSettingsSet(false); });
   }
   // Full screen, and the state read back from the browser rather than remembered here: Escape
   // and F11 leave it without going through this button, so the icon has to follow the document.
@@ -7257,25 +7394,71 @@ function toggleGauss() {
 // that is still improving when the timer fires again. The Mandelbrot terrain is a field too
 // and is `hidden`, so the menu rule already excludes it.
 const AUTO_MIN = 3, AUTO_MAX = 3600;
-let autoOn = false, autoPeriod = 60, autoT = 0, autoOrder = [], autoAt = -1;
+// The settings window's choices are remembered across reloads, like the Gaussian view is.
+const AUTO_SEC_KEY = 'fractalsplats.auto.sec';
+const AUTO_RND_KEY = 'fractalsplats.auto.rnd';
+const AUTO_INC_KEY = 'fractalsplats.auto.inc';
+function autoRemember(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
+function autoRecallSec() {
+  try {
+    const raw = localStorage.getItem(AUTO_SEC_KEY);
+    // No stored value, or one that does not parse, means the 60 second default. `+null` is 0
+    // and 0 is finite, so the parse has to be guarded against an empty read.
+    const v = raw != null && raw !== '' ? +raw : NaN;
+    if (isFinite(v) && v > 0) return v;
+  } catch (e) { /* private mode, no matter */ }
+  return 60;
+}
+function autoRecallRnd() {
+  try { return localStorage.getItem(AUTO_RND_KEY) === '1'; } catch (e) { return false; }
+}
+// Null means "no stored choice": every fractal is included, which is the default. When it has a
+// value it is a comma separated list of the PRESETS keys the viewer wants in the loop.
+function autoRecallInclude() {
+  try {
+    const v = localStorage.getItem(AUTO_INC_KEY);
+    if (v == null) return null;
+    return new Set(v.split(',').filter(k => PRESETS[k]));
+  } catch (e) { return null; }
+}
+function autoStoreInclude(set) {
+  autoRemember(AUTO_INC_KEY, set ? Array.from(set).sort().join(',') : '');
+}
+
+let autoOn = false, autoPeriod = autoRecallSec(), autoT = 0, autoOrder = [], autoAt = -1;
+// Randomize target is off by default: a timed switch lands on each object's measured opening
+// view, which is the one that keeps structure on every side of the frame. Turned on, the switch
+// picks one of the object's named aims at random instead, so a long projector run visits the
+// whole curve and not just its best-framed patch.
+let autoRandomize = autoRecallRnd();
+// Which of the objects appear in the loop. `null` means all of them; otherwise a Set of keys the
+// viewer ticked in the settings window. The pool is recomputed from this on every toggle so the
+// running playlist is rebuilt, not silently missing an entry the viewer just resigned.
+let autoInclude = autoRecallInclude();
 
 // Named POSITIVELY, `kind === 'ifs'`, and not as everything that is not a plane: the second
 // form admits the Mandelbrot terrain, which is out today only because it is `hidden`, and whose
 // load alone is a 28x28 grid of field probes plus a boundary projection for each of six targets,
 // synchronously, inside the frame callback. `hidden` and `direct` are kept as well so this pool
 // can never contain something the object menu does not.
-function autoPool() {
+function autoAll() {
   return Object.keys(PRESETS).filter(k => {
     const P = PRESETS[k];
     return !P.hidden && !P.direct && P.kind === 'ifs';
   });
 }
+function autoPool() {
+  const all = autoAll();
+  if (!autoInclude) return all;
+  return all.filter(k => autoInclude.has(k));
+}
 
 // Fisher-Yates, and the walk starts at whatever is on screen: `indexOf` returns -1 for an
-// object outside the order, which is the Mandelbrot or the Julia set, and -1 steps to 0, so
+// object outside the order, which is a plane or one the viewer unticked, and -1 steps to 0, so
 // the first switch is to the head of the order rather than past it.
 function autoShuffle() {
   const pool = autoPool();
+  // A pool with no room to move (one or zero entries) is a fixed playlist, not a random one.
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
@@ -7297,6 +7480,14 @@ function autoNext() {
   loadPreset(autoOrder[autoAt], false);
   cfg.rate = rate;
   cfg.autopilot = run;
+  // Randomize target, when asked for: loadPreset aimed at the object's opening view, and this
+  // re-aims at one of its other named aims at random so a long run visits the whole object.
+  // Only when the object actually has more than one named aim; a single aim has nothing to vary.
+  if (autoRandomize && aimList.length > 1) {
+    const pick = aimList[Math.floor(Math.random() * aimList.length)];
+    aimIdx = pick;
+    setGoal(pick);
+  }
   // The flight state is the previous object's and loadPreset does not own it. Switching away
   // from an escape time field that had turned around at its precision wall leaves `climbing`
   // set, and the new object then opens at cam.startDist with the climb branch live: it passes
@@ -7318,6 +7509,53 @@ function autoTick(dt) {
   if (autoT < autoPeriod) return;
   autoT = 0;
   autoNext();
+}
+
+/* --------------------------- the settings window --------------------------- */
+// A small dialog over the tool bar. It opens on the gear and closes on the gear again, the
+// cross, Escape, or a click outside; pressing outside is what makes it feel like a window over
+// the room rather than a stray panel. `hidden` on the element is the source of truth for the
+// eye; `autoSettingsOpen` mirrors it so syncUI can keep the gear's aria-expanded right.
+let autoSettingsOpen = false;
+function autoSettingsSet(open) {
+  autoSettingsOpen = !!open;
+  const d = el('auto-settings');
+  if (d) d.hidden = !autoSettingsOpen;
+  const g = el('btn-auto-settings');
+  if (g) g.setAttribute('aria-expanded', autoSettingsOpen ? 'true' : 'false');
+  // Refresh the window's own controls so what it shows matches the state it was opened with.
+  if (autoSettingsOpen) syncUI();
+}
+
+// The include list, rebuilt from the same pool the loop walks. Every object is a checkbox on by
+// default; unchecking one removes it from the loop until it is checked again. `autoInclude` is a
+// Set of the checked keys, or null for "everyone", and is recomputed from the boxes on input so
+// the two can never disagree. A change while the loop is running re-draws the order.
+function buildAutoFractalList(host) {
+  const list = el('auto-fractal-list');
+  if (!list) return;
+  list.innerHTML = '';
+  for (const k of autoAll()) {
+    const lbl = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = !autoInclude || autoInclude.has(k);
+    box.addEventListener('change', () => {
+      // Rebuild the Set from every box, so a mix of checks and unchecks lands correctly.
+      const next = new Set();
+      for (const b of list.querySelectorAll('input')) if (b.checked) next.add(b._k);
+      autoInclude = next.size === autoAll().length ? null : next;
+      autoStoreInclude(autoInclude);
+      // The viewer may have unticked the object on screen or just resigned one; re-draw the
+      // order from where we are so the playlist always starts at the current object.
+      if (autoOn) autoShuffle();
+    });
+    box._k = k;
+    lbl.appendChild(box);
+    lbl.appendChild(document.createTextNode(PRESETS[k].name));
+    list.appendChild(lbl);
+  }
+  if (host) host._built = true;
 }
 
 /* ------------------------------ full screen ------------------------------- */
@@ -7362,6 +7600,11 @@ function setUIHidden(v) {
   uiHidden = !!v;
   if (typeof document !== 'undefined' && document.documentElement) {
     document.documentElement.setAttribute('data-ui', uiHidden ? '0' : '1');
+  }
+  // Tell the room's own chrome: the settings window must not survive the hammer that hides
+  // everything, and this is the one event the gear handler already listens for.
+  if (uiHidden && typeof document !== 'undefined') {
+    document.dispatchEvent(new CustomEvent('ui-hidden'));
   }
   syncUI();
 }
