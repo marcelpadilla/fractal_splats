@@ -1,13 +1,10 @@
-# Fractal Splats
+# Real-Time Fractal Splats
 
 An experiment on using Gaussian splats to show fractals. Self similarity is used to create its own
-level of detail hierarchy efficiently while avoiding pixel based computations.
-
-- Dr. Marcel Padilla
+level of detail hierarchy efficiently while avoiding pixel based computations. Provided by Dr. Marcel Padilla. A live demo can be found on the project page.
 
 
-Live demo on the [![Project page](https://img.shields.io/badge/Project%20page-8f1f1c?style=for-the-badge)](https://marcelpadilla.github.io/Projects/Fractal_Splats/). The code runs in a single html.
-
+[![Project page](https://img.shields.io/badge/Project%20page-8f1f1c?style=for-the-badge)](https://marcelpadilla.github.io/Projects/Fractal_Splats/)
 
 
 <p align="center">
@@ -17,3 +14,6 @@ Live demo on the [![Project page](https://img.shields.io/badge/Project%20page-8f
 <p align="center">
   <em>Gaussian splat rendering of the folded dragon.</em>
 </p>
+
+
+The code runs in a single html inside your browser.
